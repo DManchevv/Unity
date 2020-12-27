@@ -1,0 +1,2731 @@
+
+#ifdef MIOPEN_USE_RNE_BFLOAT16
+        // When the exponent bits are not all 1s, then the value is zero, normal,
+        // or subnormal. We round the bfloat16 mantissa up by adding 0x7FFF, plus
+        // 1 if the least significant bit of the bfloat16 mantissa is 1 (odd).
+        // This causes the bfloat16's mantissa to be incremented by 1 if the 16
+        // least significant bits of the float mantissa are greater than 0x8000,
+        // or if they are equal to 0x8000 and the least significant bit of the
+        // bfloat16 mantissa is 1 (odd). This causes it to be rounded to even when
+        // the lower 16 bits are exactly 0x8000. If the bfloat16 mantissa already
+        // has the value 0x7f, then incrementing it causes it to become 0x00 and
+        // the exponent is incremented by one, which is the next higher FP value
+        // to the unrounded bfloat16 value. When the bfloat16 value is subnormal
+        // with an exponent of 0x00 and a mantissa of 0x7F, it may be rounded up
+        // to a normal value with an exponent of 0x01 and a mantissa of 0x00.
+        // When the bfloat16 value has an exponent of 0xFE and a mantissa of 0x7F,
+        // incrementing it causes it to become an exponent of 0xFF and a mantissa
+        // of 0x00, which is Inf, the next higher value to the unrounded value.
+        target_val.u32 +=
+            (0x7fff + (target_val.ushortx2.hi & 1)); // Round to nearest, round to even
+#else                                                // Truncation rounding
+// do nothing
+#endif
+    }
+    return target_val.ushortx2.hi;
+}
+
+
+#define PPCAT_NX(A, B) A##B
+#define PPCAT(A, B) PPCAT_NX(A, B)
+#define TWO 2
+#define FOUR 4
+#define EIGHT 8
+
+#if MIOPEN_USE_FP16 == 1
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#define _FLOAT half
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 2 /* sizeof is unavailable for preprocessor */
+#ifndef HALF_MAX
+#define MAX_VAL 65504 /* max value */
+#else
+#define MAX_VAL HALF_MAX
+#endif
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define _FLOAT float
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 4 /* sizeof is unavailable for preprocessor */
+#ifndef FLT_MAX
+#define MAX_VAL 3.402823466e+38F /* max value */
+#else
+#define MAX_VAL FLT_MAX
+#endif
+#endif
+#if MIOPEN_USE_BFP16 == 1
+#define _FLOAT ushort
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 2 /* sizeof is unavailable for preprocessor */
+#define MAX_VAL 0x7F7F /* max value */
+#endif
+
+#define _FLOAT2 PPCAT(_FLOAT, TWO)
+#define _FLOAT4 PPCAT(_FLOAT, FOUR)
+#define _FLOAT8 PPCAT(_FLOAT, EIGHT)
+
+#if MIOPEN_USE_FP16 == 1
+#define CVT_FLOAT2ACCUM(x) ((_FLOAT_ACCUM)(x))
+#define CVT_ACCUM2FLOAT(x) ((_FLOAT)(x))
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define CVT_FLOAT2ACCUM(x) ((_FLOAT_ACCUM)(x))
+#define CVT_ACCUM2FLOAT(x) ((_FLOAT)(x))
+#endif
+#if MIOPEN_USE_BFP16 == 1
+#define CVT_FLOAT2ACCUM(x) bfloat16_to_float(x)
+#define CVT_ACCUM2FLOAT(x) float_to_bfloat16(x)
+#endif
+
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+uint iDiv_legacy(uint v, uint d)
+{
+    uint r = (uint)((float)v * (1.0f / (float)d) + 0.00001f);
+    return (r);
+}
+
+uint iDiv(uint v, uint d)
+{
+    uint r = v / d;
+    return (r);
+}
+
+uint iMod(uint v, uint u, uint d)
+{
+    uint r = v - mul24((uint)u, (uint)d);
+    return (r);
+}
+
+
+// Since float_types.h has enabled true mixed precision for all
+// direct ocl kernels, this kernel needs to retain its older behavior as it is
+// dependent upon tunability which isn't slated for MIOpen 2.0 PR #1725
+#if MIOPEN_USE_FP16 == 1
+#undef _FLOAT_ACCUM
+#define _FLOAT_ACCUM _FLOAT
+#define CVT_FLOAT2ACCUM(x) ((_FLOAT_ACCUM)(x))
+#define CVT_ACCUM2FLOAT(x) ((_FLOAT)(x))
+#endif
+
+#define UNUSED __attribute__((__unused__))
+
+#define DBG_OUT_OF_RNGE 0
+
+__attribute__((reqd_work_group_size(MLO_GRP_SZ0, MLO_GRP_SZ1, MLO_GRP_SZ2))) __kernel void
+MIOpenConv1x1(const __global _FLOAT* __restrict in_ptr,
+              __constant _FLOAT* __restrict wei_ptr,
+#if MLO_CONV_BIAS
+              const __global _FLOAT* __restrict bias,
+#endif
+              __global _FLOAT* __restrict out_ptr,
+              UNUSED _FLOAT dummy_val // nothing
+              )
+{
+    _FLOAT weights[MLO_N_LCL_OUT_MAPS][MLO_N_LCL_IN_MAPS];
+
+    uint gbl_id0  = get_global_id(0);
+    uint batch_id = gbl_id0 / MLO_MAP_SZ4; // batch
+    uint pos      = gbl_id0 % MLO_MAP_SZ4;
+
+    uint out_grp_block = get_group_id(1); // block of outputs for the entire group
+    uint out_id        = out_grp_block * MLO_N_LCL_OUT_MAPS;
+
+    uint gbl_in_off = batch_id * MLO_IN_BATCH_STRIDE + pos * MLO_READ_UNIT;
+
+    uint wei_off = out_id *
+#if MLO_DIR_FORWARD == 1
+                   MLO_WEI_BSTRIDE
+#else
+                   MLO_WEI_CHANNEL_STRIDE
+#endif
+        ;
+
+    _FLOAT_ACCUM accum[MLO_N_LCL_OUT_MAPS][MLO_READ_UNIT] = {{(_FLOAT_ACCUM)0.0f}};
+    _FLOAT dat[MLO_N_LCL_IN_MAPS][MLO_READ_UNIT];
+
+    for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+    {
+        for(uint i = 0; i < MLO_READ_UNIT; ++i)
+        {
+            accum[o][i] = (_FLOAT_ACCUM)0.0f;
+        }
+    }
+
+    for(uint ci = 0; ci < MLO_CLOOP0; ++ci,
+             // move input offset
+                                      gbl_in_off += MLO_N_LCL_IN_MAPS * MLO_IN_CHANNEL_STRIDE,
+
+             // move weights offset
+                                      wei_off += MLO_N_LCL_IN_MAPS *
+#if MLO_DIR_FORWARD == 1
+                                                 MLO_WEI_CHANNEL_STRIDE
+#else
+                                                 MLO_WEI_BSTRIDE
+#endif
+        )
+    {
+        // read weights
+
+        __constant _FLOAT* w1 = wei_ptr + wei_off;
+
+        for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o,
+                 w1 +=
+#if MLO_DIR_FORWARD == 1
+                                                MLO_WEI_BSTRIDE
+#else
+                                                MLO_WEI_CHANNEL_STRIDE
+#endif
+            )
+        {
+            __constant _FLOAT* w2 = w1;
+            for(uint c = 0; c < MLO_N_LCL_IN_MAPS; ++c,
+                     w2 +=
+#if MLO_DIR_FORWARD == 1
+                                                   MLO_WEI_CHANNEL_STRIDE
+#else
+                                                   MLO_WEI_BSTRIDE
+#endif
+                )
+            {
+
+                weights[o][c] = *w2;
+
+#if DBG_OUT_OF_RNGE
+                if(wei_off2 >= MLO_N_INPUTS * MLO_N_OUTPUTS)
+                {
+                    printf("K:oor: weights\n");
+                }
+#endif
+            }
+        }
+
+        // convolve with all weights
+        // read data
+        // Shader compiler will use      GLOAL_LOAD_DWORD's OFFSET for *(ptr+index) access
+        // Shader compiler will not use  GLOAL_LOAD_DWORD's OFFSET for ptr[index] access
+
+        __global const _FLOAT* p = in_ptr + gbl_in_off;
+
+        for(uint j = 0; j < MLO_N_LCL_IN_MAPS; j++)
+        {
+            for(uint i = 0; i < MLO_READ_UNIT; ++i)
+            {
+                dat[j][i] = *(p + i);
+#if DBG_OUT_OF_RNGE
+                if(gbl_in_off1 + i >= MLO_IN_BATCH_STRIDE * MLO_BATCH_SZ)
+                {
+                    printf("K:oor: inputs\n");
+                }
+#endif
+            }
+            p += MLO_IN_CHANNEL_STRIDE;
+        }
+
+        // convolve
+        for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+        {
+            _FLOAT_ACCUM acc[MLO_READ_UNIT] = {(_FLOAT_ACCUM)0.0f};
+            for(uint c = 0; c < MLO_N_LCL_IN_MAPS; ++c)
+            {
+                _FLOAT_ACCUM we = CVT_FLOAT2ACCUM(weights[o][c]);
+                _FLOAT* d       = &dat[c][0];
+                for(uint i = 0; i < MLO_READ_UNIT; ++i)
+                {
+                    acc[i] += CVT_FLOAT2ACCUM(d[i]) * we;
+                }
+            }
+            for(uint i = 0; i < MLO_READ_UNIT; ++i)
+                accum[o][i] += acc[i];
+        }
+    }
+
+    uint gbl_out_off =
+        batch_id * MLO_OUT_BATCH_STRIDE + pos * MLO_READ_UNIT + out_id * MLO_OUT_CHANNEL_STRIDE;
+    __global _FLOAT* q = out_ptr + gbl_out_off;
+
+    for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o, q += MLO_OUT_CHANNEL_STRIDE)
+    {
+        for(uint i = 0; i < MLO_READ_UNIT; ++i)
+        {
+            *(q + i) = CVT_ACCUM2FLOAT(accum[o][i]);
+        }
+    }
+}
+
+/************************************************************************
+stride and padding
+*************************************************************************/
+__attribute__((reqd_work_group_size(MLO_GRP_SZ0, MLO_GRP_SZ1, MLO_GRP_SZ2))) __kernel void
+MIOpenConv1x1pquv(const __global _FLOAT* __restrict in_ptr,
+                  __constant _FLOAT* __restrict wei_ptr,
+#if MLO_CONV_BIAS
+                  const __global _FLOAT* __restrict bias,
+#endif
+                  __global _FLOAT* __restrict out_ptr,
+                  UNUSED _FLOAT dummy_val // nothing
+                  )
+{
+
+    _FLOAT weights[MLO_N_LCL_OUT_MAPS][MLO_N_LCL_IN_MAPS];
+
+    uint gbl_id0 = get_global_id(0);
+
+    uint batch_id  = gbl_id0 / MLO_MAP_SZ4; // batch
+    uint pos       = gbl_id0 % MLO_MAP_SZ4;
+    uint pos_out_y = pos / MLO_OUT_WIDTH4;
+    uint pos_out_x = pos % MLO_OUT_WIDTH4;
+
+#if MLO_DIR_FORWARD == 1
+    uint pos_in_y = pos_out_y * MLO_FILTER_STRIDE1;
+    uint pos_in_x = pos_out_x * MLO_FILTER_STRIDE0;
+#else
+    uint pos_in_y = pos_out_y; /// MLO_FILTER_STRIDE1;   - divided already
+    uint pos_in_x = pos_out_x; // MLO_FILTER_STRIDE0;  - divided already
+#endif
+
+    uint out_grp_block = get_group_id(1); // block of outputs for the entire group
+    uint out_id        = out_grp_block * MLO_N_LCL_OUT_MAPS;
+
+    uint gbl_in_off =
+        batch_id * MLO_IN_BATCH_STRIDE + pos_in_y * MLO_IN_STRIDE + pos_in_x * MLO_READ_UNIT;
+    //	bool vis = (pos_in_y < MLO_IN_HEIGHT);
+    //	gbl_in_off = (vis) ? gbl_in_off : 0;
+
+    uint wei_off = out_id *
+#if MLO_DIR_FORWARD == 1
+                   MLO_WEI_BSTRIDE
+#else
+                   MLO_WEI_CHANNEL_STRIDE
+#endif
+        ;
+
+    _FLOAT_ACCUM accum[MLO_N_LCL_OUT_MAPS][MLO_READ_UNIT];
+    _FLOAT dat[MLO_N_LCL_IN_MAPS][MLO_READ_UNIT];
+
+    for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+    {
+        for(uint i = 0; i < MLO_READ_UNIT; ++i)
+        {
+            accum[o][i] = CVT_FLOAT2ACCUM(0);
+        }
+    }
+
+    const __global _FLOAT* i_ptr = in_ptr + gbl_in_off;
+    __constant _FLOAT* w_ptr     = wei_ptr + wei_off;
+    for(uint ci = 0; ci < MLO_CLOOP0; ++ci)
+    {
+
+        // convolve with all weights
+        // read data
+
+        for(uint j = 0; j < MLO_N_LCL_IN_MAPS; ++j)
+        {
+            uint i = 0;
+#if MLO_READ_UNIT > 1
+            for(; i < MLO_READ_UNIT - 1; ++i)
+            {
+                uint off = i
+#if MLO_DIR_FORWARD == 1
+                           * MLO_FILTER_STRIDE0
+#endif
+                    ;
+                dat[j][i] = *(i_ptr + off);
+            }
+#endif
+
+            for(; i < MLO_READ_UNIT; ++i)
+            {
+                //				vis &= (pos_in_x + i*MLO_FILTER_STRIDE0 <
+                // MLO_IN_WIDTH);
+                uint off = i
+#if MLO_DIR_FORWARD == 1
+                           * MLO_FILTER_STRIDE0
+#endif
+                    ;
+                //				off = (vis) ? off : 0;
+                _FLOAT val = *(i_ptr + off);
+                dat[j][i]  = val;
+                //              dat[j][i] = (vis)? dat[j][i] : (_FLOAT)(0);
+            }
+
+            i_ptr += MLO_IN_CHANNEL_STRIDE;
+        }
+        // read weights
+        __constant _FLOAT* w_ptr0 = w_ptr;
+
+        for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+        {
+
+            __constant _FLOAT* w_ptr1 = w_ptr0;
+
+            for(uint c = 0; c < MLO_N_LCL_IN_MAPS; ++c)
+            {
+                weights[o][c] = *w_ptr1;
+                w_ptr1 +=
+#if MLO_DIR_FORWARD == 1
+                    MLO_WEI_CHANNEL_STRIDE
+#else
+                    MLO_WEI_BSTRIDE
+#endif
+                    ;
+            }
+
+            w_ptr0 +=
+#if MLO_DIR_FORWARD == 1
+                MLO_WEI_BSTRIDE
+#else
+                MLO_WEI_CHANNEL_STRIDE
+#endif
+                ;
+        }
+
+        w_ptr += MLO_N_LCL_IN_MAPS *
+#if MLO_DIR_FORWARD == 1
+                 MLO_WEI_CHANNEL_STRIDE
+#else
+                 MLO_WEI_BSTRIDE
+#endif
+            ;
+        // convolve
+        for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+        {
+            for(uint c = 0; c < MLO_N_LCL_IN_MAPS; ++c)
+            {
+                for(uint i = 0; i < MLO_READ_UNIT; ++i)
+                {
+                    accum[o][i] += CVT_FLOAT2ACCUM(dat[c][i]) * CVT_FLOAT2ACCUM(weights[o][c]);
+#if 0
+                    if (pos_out_y == 2 && pos_out_x == 0)
+                    {
+                        printf((__constant char *)"K:c: %f %f %f %f\n",
+                        accum[o][i],
+                        dat[c][i] * weights[o][c],
+                        dat[c][i],
+                        weights[o][c]
+                        );
+                    }
+#endif
+                }
+            }
+        }
+    }
+
+    uint out_y = pos_out_y
+#if MLO_DIR_FORWARD == 0
+                 * MLO_FILTER_STRIDE1
+#endif
+        ;
+    uint out_x = pos_out_x
+#if MLO_DIR_FORWARD == 0
+                 * MLO_FILTER_STRIDE0
+#endif
+        ;
+
+    uint gbl_out_off = batch_id * MLO_OUT_BATCH_STRIDE + out_id * MLO_OUT_CHANNEL_STRIDE +
+                       out_y * MLO_OUT_STRIDE + out_x * MLO_READ_UNIT;
+
+    __global _FLOAT* q = out_ptr + gbl_out_off;
+
+    for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o, q += MLO_OUT_CHANNEL_STRIDE)
+    {
+
+        for(uint i = 0; i < MLO_READ_UNIT; ++i)
+        {
+            __global _FLOAT* q1 = q;
+            q1 += i
+#if MLO_DIR_FORWARD == 0
+
+                  * MLO_FILTER_STRIDE0
+#endif
+                ;
+            *q1 = CVT_ACCUM2FLOAT(accum[o][i]);
+
+#if MLO_DIR_FORWARD == 0
+            for(uint s = 1; s < MLO_FILTER_STRIDE0; ++s)
+            {
+#if MLO_HORIZ_ALIGNED == 0
+                if(out_x + s < MLO_OUT_WIDTH)
+#endif
+                {
+                    *(q1 + s) = CVT_ACCUM2FLOAT(0);
+                }
+            }
+#endif
+        }
+
+#if MLO_DIR_FORWARD == 0
+        __global _FLOAT* q2 = q;
+        for(uint j = 1; j < MLO_FILTER_STRIDE1; ++j)
+        {
+            q2 += MLO_OUT_STRIDE;
+#if MLO_VERT_ALIGNED == 0
+            if(out_y + j < MLO_OUT_HEIGHT)
+#endif
+            {
+
+                for(uint s = 0; s < MLO_READ_UNIT * MLO_FILTER_STRIDE0; ++s)
+                {
+#if MLO_HORIZ_ALIGNED == 0
+                    if(out_x + s < MLO_OUT_WIDTH)
+#endif
+                    {
+                        *(q2 + s) = CVT_ACCUM2FLOAT(0);
+                    }
+                }
+            }
+        }
+#endif
+    }
+}
+        /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+
+// Trying to use float ATOMIC_ADD to increase total waves
+// For example,  7x7 : 49
+// Global 0:  H * W * N * (K/ 16 outplane per threads ) * (( Inputlanes/ 128 )   or 1)
+// N * H * W =
+//    [groupId / ((K/ 16 outplane per threads ) * (( Inputlanes/ 128 )   or 1))] * 64 + localId
+// For example, H7*W7*N*C256*K64
+// FIRST 4 waves
+// Hit L2 for read
+// try to Hit L2 for Atomic_ADD
+// Assembly Shader can utlize LDS to Reductiion
+// However Shader Compiler of OpenCL will compile any localId[1] to FLAT_BUFFER_LOAD not constant
+// load
+
+// WAVE 0  == N0_7x7 + N1_(7x2+1),  output  0-15  from K=64,  Inputplanes from 0-127
+// WAVE 1  == N0_7x7 + N1_(7x2+1),  output  16-31 from K=64,  Inputplanes from 0-127
+// WAVE 2  == N0_7x7 + N1_(7x2+1),  output  31-47 from K=64,  Inputplanes from 0-127
+// WAVE 3  == N0_7x7 + N1_(7x2+1),  output  48-63 from K=64,  Inputplanes from 0-127
+// 2nd 4 waves
+// Hit L2 for read
+// try to Hit L2 for Atomic_ADD
+
+// WAVE 4  == N0_7x7 + N1_(7x2+1),  output  0-15  from K=64,  Inputplanes from 128-255
+// WAVE 5  == N0_7x7 + N1_(7x2+1),  output  16-31 from K=64,  Inputplanes from 128-255
+// WAVE 6  == N0_7x7 + N1_(7x2+1),  output  31-47 from K=64,  Inputplanes from 128-255
+// WAVE 7  == N0_7x7 + N1_(7x2+1),  output  48-63 from K=64,  Inputplanes from 128-255
+
+// example
+#if 0 // ndef MLopen_RUNNING
+#define BATCHSIZE 32
+#define MLO_N_LCL_IN_MAPS_ONCE 8
+
+#define H 28
+#define W 28
+#define C 192
+#define K 64
+
+#define MLO_IN_HEIGHT H
+#define MLO_IN_WIDTH W
+#define MLO_N_INPUTS C
+
+//128 or MLO_N_INPUTS
+#define MLO_N_LCL_IN_MAPS 192
+
+#define MLO_N_OUTPUTS K
+
+#define H_out 28
+#define W_out 28
+#define MLO_N_LCL_OUT_MAPS 16
+
+#define MLO_N_IN_GROUPS ((MLO_N_INPUTS + MLO_N_LCL_IN_MAPS - 1) / MLO_N_LCL_IN_MAPS)
+#define MLO_CLOOP0 (MLO_N_LCL_IN_MAPS / MLO_N_LCL_IN_MAPS_ONCE)
+#define MLO_CLOOP2 \
+    ((MLO_N_INPUTS - MLO_N_LCL_IN_MAPS * (MLO_N_IN_GROUPS - 1)) / MLO_N_LCL_IN_MAPS_ONCE)
+#define MLO_CHEAT_SHADER_COMPILER 1
+
+#endif
+
+#define MLO_IN_CHANNEL_STRIDE (H * W)
+#define MLO_IN_BATCH_STRIDE (H * W * C)
+
+#define MLO_WEI_BSTRIDE (1 * 1 * C * K)
+#define MLO_WEI_CHANNEL_STRIDE (1 * 1 * C)
+
+#define MLO_OUT_BATCH_STRIDE (H_out * W_out * K)
+#define MLO_OUT_CHANNEL_STRIDE (H_out * W_out)
+
+#define FIXED_WORKGROUP_SIZE 64
+
+#define MLO_N_OUT_GROUPS (MLO_N_OUTPUTS / MLO_N_LCL_OUT_MAPS)
+
+#define MLO_GRP_SZ0 64
+#define MLO_GRP_SZ1 1
+#define MLO_GRP_SZ2 1
+
+#define PPCAT_NX(A, B) A##B
+#define PPCAT(A, B) PPCAT_NX(A, B)
+#define TWO 2
+#define FOUR 4
+#define EIGHT 8
+
+#if MIOPEN_USE_FP16 == 1
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#define _FLOAT half
+#define _UNION_FLOAT_T half2
+#define INIT(A) ((half2)(A[0], A[1]))
+#ifndef HALF_MAX
+#define MAX_VAL 65504 /* max value */
+#else
+#define MAX_VAL HALF_MAX
+#endif
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define _FLOAT float
+#define _UNION_FLOAT_T float
+#define INIT(A) (A[0])
+#ifndef FLT_MAX
+#define MAX_VAL 3.402823466e+38F /* max value */
+#else
+#define MAX_VAL FLT_MAX
+#endif
+#endif
+
+#define _FLOAT2 PPCAT(_FLOAT, TWO)
+#define _FLOAT4 PPCAT(_FLOAT, FOUR)
+#define _FLOAT8 PPCAT(_FLOAT, EIGHT)
+
+#define MLO_CONV_BIAS 0
+#define UNUSED __attribute((__unused__))
+
+typedef union
+{
+    unsigned int intVal;
+    _UNION_FLOAT_T floatVal;
+} starVal;
+
+inline void AtomicAdd(volatile __global _FLOAT* source, const _FLOAT operand)
+{
+    starVal newVal, prevVal;
+
+    prevVal.floatVal = INIT(source);
+    while(true)
+    {
+#if MIOPEN_USE_FP16 == 1
+        newVal.floatVal = (_FLOAT2)(prevVal.floatVal.x + operand, source[1]);
+#endif
+#if MIOPEN_USE_FP32 == 1
+        newVal.floatVal = prevVal.floatVal + operand;
+#endif
+        newVal.intVal =
+            atomic_cmpxchg((volatile __global unsigned int*)source, prevVal.intVal, newVal.intVal);
+
+        // equal to pass
+        if(newVal.intVal == prevVal.intVal)
+            break;
+
+        prevVal.intVal = newVal.intVal;
+    }
+}
+
+__attribute__((reqd_work_group_size(MLO_GRP_SZ0, MLO_GRP_SZ1, MLO_GRP_SZ2))) __kernel void
+MIOpenConv1x1(const __global _FLOAT* __restrict in_ptr,
+              __constant _FLOAT* __restrict wei_ptr,
+#if MLO_CONV_BIAS
+              const __global _FLOAT* __restrict bias,
+#endif
+              __global _FLOAT* __restrict out_ptr,
+              UNUSED _FLOAT dummy_val // nothing
+              )
+{
+
+    uint grp_id0       = get_group_id(0);
+    uint out_grp_block = grp_id0 % MLO_N_OUT_GROUPS;
+    uint in_grp_block  = (uint)(grp_id0 / MLO_N_OUT_GROUPS) % MLO_N_IN_GROUPS;
+    uint grp_id0_faked = (uint)(grp_id0 / MLO_N_OUT_GROUPS) / MLO_N_IN_GROUPS;
+
+    uint local_id0 = get_local_id(0);
+#if MLO_CHEAT_SHADER_COMPILER == 1
+    uint grp_id2 = get_group_id(2);
+#endif
+
+    uint pos      = (grp_id0_faked * FIXED_WORKGROUP_SIZE + local_id0) % MLO_IN_CHANNEL_STRIDE;
+    uint batch_id = (grp_id0_faked * FIXED_WORKGROUP_SIZE + local_id0) / MLO_IN_CHANNEL_STRIDE;
+
+    if(batch_id >= BATCHSIZE)
+        return;
+
+    uint out_id = out_grp_block * MLO_N_LCL_OUT_MAPS;
+
+    uint gbl_in_off = batch_id * MLO_IN_BATCH_STRIDE +
+                      in_grp_block * MLO_N_LCL_IN_MAPS * MLO_IN_CHANNEL_STRIDE + pos;
+
+    uint wei_off = out_id * MLO_WEI_CHANNEL_STRIDE + in_grp_block * MLO_N_LCL_IN_MAPS;
+
+    _FLOAT accum[MLO_N_LCL_OUT_MAPS];
+    _FLOAT weights[MLO_N_LCL_IN_MAPS_ONCE];
+    _FLOAT dat[MLO_N_LCL_IN_MAPS_ONCE];
+    _FLOAT dat2[MLO_N_LCL_IN_MAPS_ONCE];
+
+//
+
+// ATOMIC is needed if INPUTS in many waves
+#if(MLO_N_LCL_IN_MAPS != MLO_N_INPUTS)
+
+    if(in_grp_block == 0)
+    {
+        uint gbl_out_off = batch_id * MLO_OUT_BATCH_STRIDE + out_id * MLO_OUT_CHANNEL_STRIDE + pos;
+        __global _FLOAT* q = out_ptr + gbl_out_off;
+
+        for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+        {
+            *q = (_FLOAT)0;
+            q += MLO_OUT_CHANNEL_STRIDE;
+        }
+    }
+#endif
+
+    for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+    {
+        accum[o] = (_FLOAT)0;
+    }
+
+#if MLO_N_INPUTS == ((MLO_N_INPUTS / MLO_N_LCL_IN_MAPS) * MLO_N_LCL_IN_MAPS)
+    // if(1)
+    int loops = MLO_CLOOP0;
+
+#if MLO_CHEAT_SHADER_COMPILER == 1
+    // cheat shader compiler to disable loop unroll.  it will have better SQC performance
+    if(grp_id2 == 0x1F)
+    {
+        loops = 377; // strange not to unroll loop
+    }
+#endif
+#else
+    int loops = MLO_CLOOP0;
+
+    if(in_grp_block == (MLO_N_IN_GROUPS - 1))
+    {
+        loops = MLO_CLOOP2;
+    }
+
+#if MLO_CHEAT_SHADER_COMPILER == 1
+    // cheat shader compiler to disable loop unroll.  it will have better SQC performance
+    if(grp_id2 == 0x1F)
+    {
+        loops = 377; // strange not to unroll loop
+    }
+#endif
+
+#endif
+    {
+        __global const _FLOAT* p = in_ptr + gbl_in_off;
+        __constant _FLOAT* w     = wei_ptr + wei_off;
+
+        // read data
+        for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+        {
+
+            dat[j] = *p;
+            p += MLO_IN_CHANNEL_STRIDE;
+        }
+
+        for(uint ci = 0; ci < (loops - 2); ci += 2)
+        {
+            // read data
+            for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+            {
+                dat2[j] = *p;
+                p += MLO_IN_CHANNEL_STRIDE;
+            }
+
+            // convolve
+            __constant _FLOAT* w1 = w;
+            for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+            {
+
+                __constant _FLOAT* w2 = w1;
+
+                for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+                {
+                    weights[j] = *w2;
+                    w2++;
+                }
+                w1 += MLO_WEI_CHANNEL_STRIDE;
+
+                for(uint c = 0; c < MLO_N_LCL_IN_MAPS_ONCE; ++c)
+                {
+                    accum[o] += dat[c] * weights[c];
+                }
+            }
+
+            // move weights offset
+            w += MLO_N_LCL_IN_MAPS_ONCE;
+
+            // convolve
+            w1 = w;
+            for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+            {
+                dat[j] = *p;
+                p += MLO_IN_CHANNEL_STRIDE;
+            }
+
+            for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+            {
+
+                __constant _FLOAT* w2 = w1;
+
+                for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+                {
+                    weights[j] = *w2;
+                    w2++;
+                }
+                w1 += MLO_WEI_CHANNEL_STRIDE;
+
+                for(uint c = 0; c < MLO_N_LCL_IN_MAPS_ONCE; ++c)
+                {
+                    accum[o] += dat2[c] * weights[c];
+                }
+            }
+
+            // move weights offset
+            w += MLO_N_LCL_IN_MAPS_ONCE;
+        }
+
+        //
+        // last 2 iterations
+        { // read data
+            for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+            {
+                dat2[j] = *p;
+                p += MLO_IN_CHANNEL_STRIDE;
+            }
+
+            // convolve
+            __constant _FLOAT* w1 = w;
+            for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+            {
+
+                __constant _FLOAT* w2 = w1;
+
+                for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+                {
+                    weights[j] = *w2;
+                    w2++;
+                }
+                w1 += MLO_WEI_CHANNEL_STRIDE;
+
+                for(uint c = 0; c < MLO_N_LCL_IN_MAPS_ONCE; ++c)
+                {
+                    accum[o] += dat[c] * weights[c];
+                }
+            }
+
+            // move weights offset
+            w += MLO_N_LCL_IN_MAPS_ONCE;
+
+            // convolve
+            w1 = w;
+
+            for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+            {
+
+                __constant _FLOAT* w2 = w1;
+
+                for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+                {
+                    weights[j] = *w2;
+                    w2++;
+                }
+                w1 += MLO_WEI_CHANNEL_STRIDE;
+
+                for(uint c = 0; c < MLO_N_LCL_IN_MAPS_ONCE; ++c)
+                {
+                    accum[o] += dat2[c] * weights[c];
+                }
+            }
+
+            // move weights offset
+            w += MLO_N_LCL_IN_MAPS_ONCE;
+        }
+    }
+
+    uint gbl_out_off   = batch_id * MLO_OUT_BATCH_STRIDE + out_id * MLO_OUT_CHANNEL_STRIDE + pos;
+    __global _FLOAT* q = out_ptr + gbl_out_off;
+
+    for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+    {
+#if(MLO_N_LCL_IN_MAPS == MLO_N_INPUTS)
+        *q = accum[o];
+        q += MLO_OUT_CHANNEL_STRIDE;
+#else
+        AtomicAdd(q, accum[o]);
+        q += MLO_OUT_CHANNEL_STRIDE;
+#endif
+    }
+}
+             /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+
+// Trying to use float ATOMIC_ADD to increase total waves
+// For example,  7x7 : 49
+// Global 0:  H * W * N * (K/ 16 outplane per threads ) * (( Inputlanes/ 128 )   or 1)
+// N * H * W =
+//    [groupId / ((K/ 16 outplane per threads ) * (( Inputlanes/ 128 )   or 1))] * 64 + localId
+// For example, H7*W7*N*C256*K64
+// FIRST 4 waves
+// Hit L2 for read
+// try to Hit L2 for Atomic_ADD
+// Assembly Shader can utlize LDS to Reductiion
+// However Shader Compiler of OpenCL will compile any localId[1] to FLAT_BUFFER_LOAD not constant
+// load
+
+// WAVE 0  == N0_7x7 + N1_(7x2+1),  output  0-15  from K=64,  Inputplanes from 0-127
+// WAVE 1  == N0_7x7 + N1_(7x2+1),  output  16-31 from K=64,  Inputplanes from 0-127
+// WAVE 2  == N0_7x7 + N1_(7x2+1),  output  31-47 from K=64,  Inputplanes from 0-127
+// WAVE 3  == N0_7x7 + N1_(7x2+1),  output  48-63 from K=64,  Inputplanes from 0-127
+// 2nd 4 waves
+// Hit L2 for read
+// try to Hit L2 for Atomic_ADD
+
+// WAVE 4  == N0_7x7 + N1_(7x2+1),  output  0-15  from K=64,  Inputplanes from 128-255
+// WAVE 5  == N0_7x7 + N1_(7x2+1),  output  16-31 from K=64,  Inputplanes from 128-255
+// WAVE 6  == N0_7x7 + N1_(7x2+1),  output  31-47 from K=64,  Inputplanes from 128-255
+// WAVE 7  == N0_7x7 + N1_(7x2+1),  output  48-63 from K=64,  Inputplanes from 128-255
+
+// STRIDE Mode: Global 0:  H_out * W_out * N * (K/ 16 outplane per threads ) * (( Inputlanes/ 128 )
+// or 1)
+
+// example
+#if 0 // ndef MLopen_RUNNING
+#define MLO_FILTER_STRIDE0 2
+#define MLO_FILTER_STRIDE1 2
+#define MLO_N_LCL_IN_MAPS_ONCE 8
+
+#define H 28
+#define W 28
+#define C 192
+#define K 64
+
+#define MLO_IN_HEIGHT H
+#define MLO_IN_WIDTH W
+#define MLO_N_INPUTS C
+
+//128 or MLO_N_INPUTS
+#define MLO_N_LCL_IN_MAPS 192
+
+#define MLO_N_OUTPUTS K
+
+#define H_out 28
+#define W_out 28
+#define MLO_N_LCL_OUT_MAPS 16
+
+#define MLO_N_IN_GROUPS ((MLO_N_INPUTS + MLO_N_LCL_IN_MAPS - 1) / MLO_N_LCL_IN_MAPS)
+#define MLO_CLOOP0 (MLO_N_LCL_IN_MAPS / MLO_N_LCL_IN_MAPS_ONCE)
+#define MLO_CLOOP2 \
+    ((MLO_N_INPUTS - MLO_N_LCL_IN_MAPS * (MLO_N_IN_GROUPS - 1)) / MLO_N_LCL_IN_MAPS_ONCE)
+#define MLO_CHEAT_SHADER_COMPILER 1
+
+#endif
+
+#define MLO_IN_CHANNEL_STRIDE (H * W)
+#define MLO_IN_BATCH_STRIDE (H * W * C)
+
+#define MLO_WEI_BSTRIDE (1 * 1 * C * K)
+#define MLO_WEI_CHANNEL_STRIDE (1 * 1 * C)
+
+#define MLO_OUT_BATCH_STRIDE (H_out * W_out * K)
+#define MLO_OUT_CHANNEL_STRIDE (H_out * W_out)
+
+#define FIXED_WORKGROUP_SIZE 64
+
+#define MLO_N_OUT_GROUPS (MLO_N_OUTPUTS / MLO_N_LCL_OUT_MAPS)
+
+#define MLO_GRP_SZ0 64
+#define MLO_GRP_SZ1 1
+#define MLO_GRP_SZ2 1
+
+#define PPCAT_NX(A, B) A##B
+#define PPCAT(A, B) PPCAT_NX(A, B)
+#define TWO 2
+#define FOUR 4
+#define EIGHT 8
+
+#if MIOPEN_USE_FP16 == 1
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#define _FLOAT half
+#define _UNION_FLOAT_T half2
+#define INIT(A) ((half2)(A[0], A[1]))
+#ifndef HALF_MAX
+#define MAX_VAL 65504 /* max value */
+#else
+#define MAX_VAL HALF_MAX
+#endif
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define _FLOAT float
+#define _UNION_FLOAT_T float
+#define INIT(A) (A[0])
+#ifndef FLT_MAX
+#define MAX_VAL 3.402823466e+38F /* max value */
+#else
+#define MAX_VAL FLT_MAX
+#endif
+#endif
+
+#define _FLOAT2 PPCAT(_FLOAT, TWO)
+#define _FLOAT4 PPCAT(_FLOAT, FOUR)
+#define _FLOAT8 PPCAT(_FLOAT, EIGHT)
+
+#define MLO_CONV_BIAS 0
+#define UNUSED __attribute((__unused__))
+
+typedef union
+{
+    unsigned int intVal;
+    _UNION_FLOAT_T floatVal;
+} starVal;
+
+inline void AtomicAdd(volatile __global _FLOAT* source, const _FLOAT operand)
+{
+    starVal newVal, prevVal;
+
+    prevVal.floatVal = INIT(source);
+    while(true)
+    {
+#if MIOPEN_USE_FP16 == 1
+        newVal.floatVal = (_FLOAT2)(prevVal.floatVal.x + operand, source[1]);
+#endif
+#if MIOPEN_USE_FP32 == 1
+        newVal.floatVal = prevVal.floatVal + operand;
+#endif
+        newVal.intVal =
+            atomic_cmpxchg((volatile __global unsigned int*)source, prevVal.intVal, newVal.intVal);
+
+        // equal to pass
+        if(newVal.intVal == prevVal.intVal)
+            break;
+
+        prevVal.intVal = newVal.intVal;
+    }
+}
+
+__attribute__((reqd_work_group_size(MLO_GRP_SZ0, MLO_GRP_SZ1, MLO_GRP_SZ2))) __kernel void
+MIOpenConv1x1(const __global _FLOAT* __restrict in_ptr,
+              __constant _FLOAT* __restrict wei_ptr,
+#if MLO_CONV_BIAS
+              const __global _FLOAT* __restrict bias,
+#endif
+              __global _FLOAT* __restrict out_ptr,
+              UNUSED _FLOAT dummy_val // nothing
+              )
+{
+
+    uint grp_id0       = get_group_id(0);
+    uint out_grp_block = grp_id0 % MLO_N_OUT_GROUPS;
+    uint in_grp_block  = (uint)(grp_id0 / MLO_N_OUT_GROUPS) % MLO_N_IN_GROUPS;
+    uint grp_id0_faked = (uint)(grp_id0 / MLO_N_OUT_GROUPS) / MLO_N_IN_GROUPS;
+
+    uint local_id0 = get_local_id(0);
+#if MLO_CHEAT_SHADER_COMPILER == 1
+    uint grp_id2 = get_group_id(2);
+#endif
+
+    uint pos      = (grp_id0_faked * FIXED_WORKGROUP_SIZE + local_id0) % MLO_OUT_CHANNEL_STRIDE;
+    uint batch_id = (grp_id0_faked * FIXED_WORKGROUP_SIZE + local_id0) / MLO_OUT_CHANNEL_STRIDE;
+
+    if(batch_id >= BATCHSIZE)
+        return;
+
+    uint out_id = out_grp_block * MLO_N_LCL_OUT_MAPS;
+
+    short out_pos_x = pos % W_out;
+    short out_pos_y = pos / W_out;
+
+    uint in_pos = out_pos_x * MLO_FILTER_STRIDE0 + out_pos_y * MLO_FILTER_STRIDE1 * W;
+
+    uint gbl_in_off = batch_id * MLO_IN_BATCH_STRIDE +
+                      in_grp_block * MLO_N_LCL_IN_MAPS * MLO_IN_CHANNEL_STRIDE + in_pos;
+
+    uint wei_off = out_id * MLO_WEI_CHANNEL_STRIDE + in_grp_block * MLO_N_LCL_IN_MAPS;
+
+    _FLOAT accum[MLO_N_LCL_OUT_MAPS];
+    _FLOAT weights[MLO_N_LCL_IN_MAPS_ONCE];
+    _FLOAT dat[MLO_N_LCL_IN_MAPS_ONCE];
+    _FLOAT dat2[MLO_N_LCL_IN_MAPS_ONCE];
+
+//
+
+// ATOMIC is needed if INPUTS in many waves
+#if(MLO_N_LCL_IN_MAPS != MLO_N_INPUTS)
+
+    if(in_grp_block == 0)
+    {
+        uint gbl_out_off = batch_id * MLO_OUT_BATCH_STRIDE + out_id * MLO_OUT_CHANNEL_STRIDE + pos;
+        __global _FLOAT* q = out_ptr + gbl_out_off;
+
+        for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+        {
+            *q = (_FLOAT)0;
+            q += MLO_OUT_CHANNEL_STRIDE;
+        }
+    }
+#endif
+
+    for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+    {
+        accum[o] = (_FLOAT)0;
+    }
+
+#if MLO_N_INPUTS == ((MLO_N_INPUTS / MLO_N_LCL_IN_MAPS) * MLO_N_LCL_IN_MAPS)
+    // if(1)
+    int loops = MLO_CLOOP0;
+
+#if MLO_CHEAT_SHADER_COMPILER == 1
+    // cheat shader compiler to disable loop unroll.  it will have better SQC performance
+    if(grp_id2 == 0x1F)
+    {
+        loops = 377; // strange not to unroll loop
+    }
+#endif
+#else
+    int loops = MLO_CLOOP0;
+
+    if(in_grp_block == (MLO_N_IN_GROUPS - 1))
+    {
+        loops = MLO_CLOOP2;
+    }
+
+#if MLO_CHEAT_SHADER_COMPILER == 1
+    // cheat shader compiler to disable loop unroll.  it will have better SQC performance
+    if(grp_id2 == 0x1F)
+    {
+        loops = 377; // strange not to unroll loop
+    }
+#endif
+
+#endif
+    {
+        __global const _FLOAT* p = in_ptr + gbl_in_off;
+        __constant _FLOAT* w     = wei_ptr + wei_off;
+
+        // read data
+        for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+        {
+
+            dat[j] = *p;
+            p += MLO_IN_CHANNEL_STRIDE;
+        }
+
+        for(uint ci = 0; ci < (loops - 2); ci += 2)
+        {
+            // read data
+            for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+            {
+                dat2[j] = *p;
+                p += MLO_IN_CHANNEL_STRIDE;
+            }
+
+            // convolve
+            __constant _FLOAT* w1 = w;
+            for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+            {
+
+                __constant _FLOAT* w2 = w1;
+
+                for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+                {
+                    weights[j] = *w2;
+                    w2++;
+                }
+                w1 += MLO_WEI_CHANNEL_STRIDE;
+
+                for(uint c = 0; c < MLO_N_LCL_IN_MAPS_ONCE; ++c)
+                {
+                    accum[o] += dat[c] * weights[c];
+                }
+            }
+
+            // move weights offset
+            w += MLO_N_LCL_IN_MAPS_ONCE;
+
+            // convolve
+            w1 = w;
+            for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+            {
+                dat[j] = *p;
+                p += MLO_IN_CHANNEL_STRIDE;
+            }
+
+            for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+            {
+
+                __constant _FLOAT* w2 = w1;
+
+                for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+                {
+                    weights[j] = *w2;
+                    w2++;
+                }
+                w1 += MLO_WEI_CHANNEL_STRIDE;
+
+                for(uint c = 0; c < MLO_N_LCL_IN_MAPS_ONCE; ++c)
+                {
+                    accum[o] += dat2[c] * weights[c];
+                }
+            }
+
+            // move weights offset
+            w += MLO_N_LCL_IN_MAPS_ONCE;
+        }
+
+        //
+        // last 2 iterations
+        { // read data
+            for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+            {
+                dat2[j] = *p;
+                p += MLO_IN_CHANNEL_STRIDE;
+            }
+
+            // convolve
+            __constant _FLOAT* w1 = w;
+            for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+            {
+
+                __constant _FLOAT* w2 = w1;
+
+                for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+                {
+                    weights[j] = *w2;
+                    w2++;
+                }
+                w1 += MLO_WEI_CHANNEL_STRIDE;
+
+                for(uint c = 0; c < MLO_N_LCL_IN_MAPS_ONCE; ++c)
+                {
+                    accum[o] += dat[c] * weights[c];
+                }
+            }
+
+            // move weights offset
+            w += MLO_N_LCL_IN_MAPS_ONCE;
+
+            // convolve
+            w1 = w;
+
+            for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+            {
+
+                __constant _FLOAT* w2 = w1;
+
+                for(uint j = 0; j < MLO_N_LCL_IN_MAPS_ONCE; ++j)
+                {
+                    weights[j] = *w2;
+                    w2++;
+                }
+                w1 += MLO_WEI_CHANNEL_STRIDE;
+
+                for(uint c = 0; c < MLO_N_LCL_IN_MAPS_ONCE; ++c)
+                {
+                    accum[o] += dat2[c] * weights[c];
+                }
+            }
+
+            // move weights offset
+            w += MLO_N_LCL_IN_MAPS_ONCE;
+        }
+    }
+
+    uint gbl_out_off   = batch_id * MLO_OUT_BATCH_STRIDE + out_id * MLO_OUT_CHANNEL_STRIDE + pos;
+    __global _FLOAT* q = out_ptr + gbl_out_off;
+
+    for(uint o = 0; o < MLO_N_LCL_OUT_MAPS; ++o)
+    {
+#if(MLO_N_LCL_IN_MAPS == MLO_N_INPUTS)
+        *q = accum[o];
+        q += MLO_OUT_CHANNEL_STRIDE;
+#else
+        AtomicAdd(q, accum[o]);
+        q += MLO_OUT_CHANNEL_STRIDE;
+#endif
+    }
+}
+      /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+#define PPCAT_NX(A, B) A##B
+#define PPCAT(A, B) PPCAT_NX(A, B)
+#define TWO 2
+#define FOUR 4
+#define EIGHT 8
+
+#if MIOPEN_USE_FP16 == 1
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#define _FLOAT half
+#ifndef HALF_MAX
+#define MAX_VAL 65504 /* max value */
+#else
+#define MAX_VAL HALF_MAX
+#endif
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define _FLOAT float
+#ifndef FLT_MAX
+#define MAX_VAL 3.402823466e+38F /* max value */
+#else
+#define MAX_VAL FLT_MAX
+#endif
+#endif
+
+#define _FLOAT2 PPCAT(_FLOAT, TWO)
+#define _FLOAT4 PPCAT(_FLOAT, FOUR)
+#define _FLOAT8 PPCAT(_FLOAT, EIGHT)
+
+#define UNUSED __attribute__((__unused__))
+
+#ifndef NEGATIVE_CUTOFF_VAL
+#if MIOPEN_USE_FP16 == 1
+#define NEGATIVE_CUTOFF_VAL ((_FLOAT)(-1e4))
+#else
+#define NEGATIVE_CUTOFF_VAL ((_FLOAT)(-1e20))
+#endif
+#endif
+
+#ifndef USE_SOFTMAX_LOG
+#define USE_SOFTMAX_LOG 0
+#endif
+
+#ifndef USE_SOFTMAX_ACCURATE
+#define USE_SOFTMAX_ACCURATE 0
+#endif
+
+#ifndef USE_SOFTMAX_FAST
+#define USE_SOFTMAX_FAST 0
+#endif
+
+#ifndef USE_SOFTMAX_MODE_INSTANCE
+#define USE_SOFTMAX_MODE_INSTANCE 0
+#endif
+
+#ifndef USE_SOFTMAX_MODE_CHANNEL
+#define USE_SOFTMAX_MODE_CHANNEL 0
+#endif
+
+#ifndef USE_ALPHA
+#define USE_ALPHA 0
+#endif
+
+#ifndef USE_BETA
+#define USE_BETA 0
+#endif
+
+#ifndef IS_INPUT_PACKED
+#define IS_INPUT_PACKED 1
+#endif
+
+#ifndef IS_OUTPUT_PACKED
+#define IS_OUTPUT_PACKED 1
+#endif
+
+#ifndef IS_DINPUT_PACKED
+#define IS_DINPUT_PACKED 1
+#endif
+
+#ifndef IS_DOUTPUT_PACKED
+#define IS_DOUTPUT_PACKED 1
+#endif
+
+#ifndef IN_OFFSET
+#define IN_OFFSET 0
+#endif
+
+#ifndef OUT_OFFSET
+#define OUT_OFFSET 0
+#endif
+
+#ifndef DIN_OFFSET
+#define DIN_OFFSET 0
+#endif
+
+#ifndef DOUT_OFFSET
+#define DOUT_OFFSET 0
+#endif
+
+#if(USE_SOFTMAX_LOG && USE_SOFTMAX_ACCURATE) || (USE_SOFTMAX_LOG && USE_SOFTMAX_FAST) || \
+    (USE_SOFTMAX_ACCURATE && USE_SOFTMAX_FAST) ||                                        \
+    !(USE_SOFTMAX_LOG || USE_SOFTMAX_ACCURATE || USE_SOFTMAX_FAST)
+#error "Wrong values of USE_SOFTMAX_... macros -- exactly one should be 1, others shall be 0"
+#endif
+
+#if USE_SOFTMAX_MODE_INSTANCE == USE_SOFTMAX_MODE_CHANNEL
+#error "Wrong values of USE_SOFTMAX_MODE_... macros -- exactly one should be 1, others shall be 0"
+#endif
+
+typedef union GPtr
+{
+    _FLOAT* f;
+    _FLOAT2* fv;
+} GPtr;
+
+static inline _FLOAT LogAddExp(const _FLOAT x, const _FLOAT y)
+{
+    _FLOAT a = max(x, y);
+    if(a <= NEGATIVE_CUTOFF_VAL)
+        return NEGATIVE_CUTOFF_VAL;
+
+    _FLOAT b = min(x, y);
+    if(b <= NEGATIVE_CUTOFF_VAL)
+        return a;
+
+    _FLOAT c = b - a;
+
+    return c <= NEGATIVE_CUTOFF_VAL ? a : (a + log(exp(c) + 1));
+}
+
+/* Steps to compute softmax:
+ * 1. Compute the max per channel.
+ * 2. Subtract the max from each value in the channel.
+ * 3. Compute the exponent of all the values.
+ * 4. Compute the sum of the vales per channel.
+ * 5. Normalize based on the sum.
+ *
+ * We use CSR-{Vector / Stream} approach to pick an algorithm depending on the
+ * number of channels each workgroup has to work with.
+ * J. L. Greathouse, M. Daga, Efficient sparse matrix-vector multiplication
+ * on GPUs using the CSR storage format, in: Proc. Int'l Conf. High Performance
+ * Computing, Networking, Storage and Analysis (SC'14)
+*/
+
+#if RUN_FORWARD
+__kernel void SoftmaxForward(global _FLOAT* x,
+                             global _FLOAT* y,
+                             const int vector_size,
+                             const int grid_size,
+                             const int spatial_dim,
+#if !USE_ALPHA
+                             UNUSED
+#endif
+                             const float alpha,
+#if !USE_BETA
+                             UNUSED
+#endif
+                             const float beta)
+{
+#if NUM_BATCH == 1 // CSR-Vector like approach
+
+    /* Entire workgroup works on one spatial_dim.
+     * We use logarthmic reductions to compute max and sum per channel.
+     * This approach reads in the same data thrice from DRAM but is still better
+     * than launching three different kernels.
+     * The workgroup begins by computing the nth image and s (spatial_dim) it
+     * is working on and iterates over the entire grid until finished.
+     */
+
+    local _FLOAT l_helper[256];
+
+    int gid = get_group_id(0);
+    int lid = get_local_id(0);
+
+    // Total number of workgroups launched can be less than the gridsize, hence iterate over.
+    for(gid = get_group_id(0); gid < grid_size; gid += get_num_groups(0))
+    {
+
+        int n = gid / spatial_dim; // nth image
+        int s = gid % spatial_dim; // spatial dimension (h*w)
+#if(!IS_INPUT_PACKED || !IS_OUTPUT_PACKED) && USE_SOFTMAX_MODE_CHANNEL
+        int s0 = s / INPUT_W;
+        int s1 = s % INPUT_W;
+#endif
+
+#if !USE_SOFTMAX_FAST
+        l_helper[lid] = (_FLOAT)-MAX_VAL;
+
+        _FLOAT t_helper = (_FLOAT)-MAX_VAL; // thread_local helper var
+
+        // Compute max per channel
+        // Iterate over all the channels one thread is supposed to loop over
+        // and compute max
+        for(int i = lid; i < vector_size; i += get_local_size(0))
+        {
+#if !IS_INPUT_PACKED && USE_SOFTMAX_MODE_INSTANCE
+            int i0 = i / (INPUT_W * INPUT_H);
+            int i1 = (i % (INPUT_W * INPUT_H)) / INPUT_W;
+            int i2 = (i % (INPUT_W * INPUT_H)) % INPUT_W;
+#endif
+
+            int x_gidx = IN_OFFSET;
+#if IS_INPUT_PACKED
+            x_gidx += mad24(n, vector_size, i) * spatial_dim + s;
+#else
+            x_gidx += n * INPUT_N_STRIDE;
+#if USE_SOFTMAX_MODE_INSTANCE
+            x_gidx += i0 * INPUT_C_STRIDE + i1 * INPUT_H_STRIDE + i2;
+#else
+            x_gidx += i * INPUT_C_STRIDE + s0 * INPUT_H_STRIDE + s1;
+#endif
+#endif
+
+            t_helper = max(x[x_gidx], t_helper);
+        }
+
+        // Now we have to compute the max from 256 values (one per each thread)
+        l_helper[lid] = t_helper;
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // Logarithmic reduction to compute the max.
+        for(int i = (get_local_size(0) >> 1); i > 0; i >>= 1)
+        {
+            if(lid < i)
+            {
+                l_helper[lid] = max(l_helper[lid], l_helper[lid + i]);
+            }
+            barrier(CLK_LOCAL_MEM_FENCE);
+        }
+
+        _FLOAT channel_max = l_helper[0];
+#else
+        _FLOAT
+#endif
+        t_helper =
+#if USE_SOFTMAX_LOG
+            NEGATIVE_CUTOFF_VAL
+#else
+            (_FLOAT)0.
+#endif
+            ;
+
+        // Subtract channel_max from each value
+        for(int i = lid; i < vector_size; i += get_local_size(0))
+        {
+#if !IS_INPUT_PACKED && USE_SOFTMAX_MODE_INSTANCE
+            int i0 = i / (INPUT_W * INPUT_H);
+            int i1 = (i % (INPUT_W * INPUT_H)) / INPUT_W;
+            int i2 = (i % (INPUT_W * INPUT_H)) % INPUT_W;
+#endif
+
+            int x_gidx = IN_OFFSET;
+#if IS_INPUT_PACKED
+            x_gidx += mad24(n, vector_size, i) * spatial_dim + s;
+#else
+            x_gidx += n * INPUT_N_STRIDE;
+#if USE_SOFTMAX_MODE_INSTANCE
+            x_gidx += i0 * INPUT_C_STRIDE + i1 * INPUT_H_STRIDE + i2;
+#else
+            x_gidx += i * INPUT_C_STRIDE + s0 * INPUT_H_STRIDE + s1;
+#endif
+#endif
+
+            _FLOAT value = x[x_gidx];
+
+            // Compute exponent of each value
+            // Then sum all the values touched by this thread
+            t_helper
+#if USE_SOFTMAX_LOG
+                = LogAddExp(value - channel_max, t_helper)
+#elif USE_SOFTMAX_FAST
+                += exp(value)
+#else
+                += exp(value - channel_max)
+#endif
+                ;
+        }
+
+        l_helper[lid] = t_helper;
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // Compute sum of 256 values (one for each thread)
+        // Logarithmic reduction to compute the sum
+        for(int i = (get_local_size(0) >> 1); i > 0; i >>= 1)
+        {
+            if(lid < i)
+            {
+                l_helper[lid]
+#if USE_SOFTMAX_LOG
+                    = LogAddExp(l_helper[lid], l_helper[lid + i])
+#else
+                    += l_helper[lid + i]
+#endif
+                    ;
+            }
+            barrier(CLK_LOCAL_MEM_FENCE);
+        }
+
+        _FLOAT channel_sum = l_helper[0];
+
+        // Normalize each value in the channel by the channel_sum
+        for(int i = lid; i < vector_size; i += get_local_size(0))
+        {
+#if !IS_INPUT_PACKED && USE_SOFTMAX_MODE_INSTANCE
+            int i0 = i / (INPUT_W * INPUT_H);
+            int i1 = (i % (INPUT_W * INPUT_H)) / INPUT_W;
+            int i2 = (i % (INPUT_W * INPUT_H)) % INPUT_W;
+#endif
+
+            int x_gidx = IN_OFFSET;
+#if IS_INPUT_PACKED
+            x_gidx += mad24(n, vector_size, i) * spatial_dim + s;
+#else
+            x_gidx += n * INPUT_N_STRIDE;
+#if USE_SOFTMAX_MODE_INSTANCE
+            x_gidx += i0 * INPUT_C_STRIDE + i1 * INPUT_H_STRIDE + i2;
+#else
+            x_gidx += i * INPUT_C_STRIDE + s0 * INPUT_H_STRIDE + s1;
+#endif
+#endif
+
+            _FLOAT value = x[x_gidx];
+
+// Subtracting max again because we do not write the output of
+// value-max to DRAM above. Doing a subtraction again is much
+// faster than writing uncoalesced to DRAM
+#if !USE_SOFTMAX_FAST
+            value = value - channel_max;
+#endif
+#if !USE_SOFTMAX_LOG
+            value = exp(value);
+#endif
+
+            int y_gidx = OUT_OFFSET;
+#if IS_OUTPUT_PACKED
+            y_gidx += mad24(n, vector_size, i) * spatial_dim + s;
+#else
+            y_gidx += n * OUTPUT_N_STRIDE;
+#if USE_SOFTMAX_MODE_INSTANCE
+            y_gidx += i0 * OUTPUT_C_STRIDE + i1 * OUTPUT_H_STRIDE + i2;
+#else
+            y_gidx += i * OUTPUT_C_STRIDE + s0 * OUTPUT_H_STRIDE + s1;
+#endif
+#endif
+
+#if USE_SOFTMAX_LOG
+            value -= channel_sum;
+#else
+            value /= channel_sum;
+#endif
+
+#if USE_ALPHA
+            value *= ((_FLOAT)alpha);
+#endif
+
+#if USE_BETA
+            value += y[y_gidx] * ((_FLOAT)beta);
+#endif
+
+            y[y_gidx] = value;
+        }
+        (void)s;
+    }
+
+#else // CSR-Stream like approach
+
+    /* Each workgroup is computing the softmax for NUM_BATCH spatial_dims ala CSR-Stream.
+     * The number of threads iterting over channels to compute softmax for one batch is BATCH_SIZE.
+     * The number of values each thread works on is U_BATCH_SIZE (read micro batch size).
+     * Each batch in the workgroup works on its nth image and s (spatial_dim).
+     * E.g. a 256 thread workgroup with c=31 has 8 batches and a batchsize of 32.
+     * The number of workgroups launched are exactly the number as required
+     * hence, there is no for-loop.
+    */
+
+    local _FLOAT l_helper[256];
+
+    int gid = get_group_id(0);
+    int lid = get_local_id(0);
+
+    // ID of the thread within the batch
+    int batch_lid = lid & (BATCH_SIZE - 1); // thread specific channel_st
+    int batch     = lid / BATCH_SIZE;       // which spatial_dim or pixel
+
+    // Batch specific n and s
+    int batch_n   = (NUM_BATCH * gid + batch) / spatial_dim; // nth image
+    int batch_s   = (NUM_BATCH * gid + batch) % spatial_dim; // which spatial_dim/pixel
+#if(!IS_INPUT_PACKED || !IS_OUTPUT_PACKED) && USE_SOFTMAX_MODE_CHANNEL
+    int batch_s0  = batch_s / INPUT_W;
+    int batch_s1  = batch_s % INPUT_W;
+#endif
+#if !USE_SOFTMAX_FAST
+    l_helper[lid] = (_FLOAT)-MAX_VAL;
+
+    _FLOAT t_helper = (_FLOAT)-MAX_VAL; // thread_local helper var
+#endif
+// stores all the values touched by one thread so that we do not have load
+// again as the CSR-Vector approach
+
+// Comment1: Local memory is used for fp16 to get around the compiler issue reported
+// in rocm2.0 in SWDEV-175176 JIRA ticket
+#if MIOPEN_USE_FP16 == 1
+    local _FLOAT values[U_BATCH_SIZE * 256];
+#else
+    _FLOAT values[U_BATCH_SIZE];
+    for(int i = 0; i < U_BATCH_SIZE; i++)
+    {
+        values[i] = (_FLOAT)(-MAX_VAL);
+    }
+#endif
+
+    // Compute max per channel
+    // BATCH_SIZE threads iterate over the channels
+    int index0 = batch_lid / BATCH_SIZE;
+    int index  = index0;
+    for(int i = batch_lid; i < vector_size; i += BATCH_SIZE, index++)
+    {
+        if(mad24(batch_n, vector_size, i) * spatial_dim + batch_s < vector_size * grid_size)
+        {
+#if !IS_INPUT_PACKED && USE_SOFTMAX_MODE_INSTANCE
+            int i0 = i / (INPUT_W * INPUT_H);
+            int i1 = (i % (INPUT_W * INPUT_H)) / INPUT_W;
+            int i2 = (i % (INPUT_W * INPUT_H)) % INPUT_W;
+#endif
+
+            int x_gidx = IN_OFFSET;
+#if IS_INPUT_PACKED
+            x_gidx += mad24(batch_n, vector_size, i) * spatial_dim + batch_s;
+#else
+            x_gidx += batch_n * INPUT_N_STRIDE;
+#if USE_SOFTMAX_MODE_INSTANCE
+            x_gidx += i0 * INPUT_C_STRIDE + i1 * INPUT_H_STRIDE + i2;
+#else
+            x_gidx += i * INPUT_C_STRIDE + batch_s0 * INPUT_H_STRIDE + batch_s1;
+#endif
+#endif
+
+#if MIOPEN_USE_FP16 == 1 // Refer to Comment1 above for different fp16 and fp32 impl
+            _FLOAT tmp                         = x[x_gidx];
+#if !USE_SOFTMAX_FAST
+            t_helper                           = max(tmp, t_helper);
+#endif
+            values[lid * U_BATCH_SIZE + index] = tmp;
+#else
+            values[index] = x[x_gidx];
+#if !USE_SOFTMAX_FAST
+            t_helper      = max(values[index], t_helper);
+#endif
+#endif
+        }
+    }
+
+#if !USE_SOFTMAX_FAST
+    // Now we have to compute the max from 256 values (one per each thread)
+    l_helper[lid] = t_helper;
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    // Logarithmic reduction to compute the max.
+    for(int i = (BATCH_SIZE >> 1); i > 0; i >>= 1)
+    {
+        if(batch_lid < i)
+        {
+            l_helper[lid] = max(l_helper[lid], l_helper[lid + i]);
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    _FLOAT channel_max = l_helper[batch * BATCH_SIZE];
+#else
+    _FLOAT
+#endif
+    t_helper =
+#if USE_SOFTMAX_LOG
+        NEGATIVE_CUTOFF_VAL
+#else
+        (_FLOAT)0.
+#endif
+        ;
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+    // Subtract channel_max from each value
+    index = index0;
+    for(int i = batch_lid; i < vector_size; i += BATCH_SIZE, index++)
+    {
+        // Compute exponent of each value
+        // Then sum all the values touched by this thread
+        int v_idx = index;
+#if MIOPEN_USE_FP16 == 1
+        v_idx += lid * U_BATCH_SIZE;
+#endif
+
+        _FLOAT tmp = values[v_idx];
+#if !USE_SOFTMAX_FAST
+        tmp -= channel_max;
+#endif
+
+#if !USE_SOFTMAX_LOG
+        tmp      = exp(tmp);
+#endif
+
+#if USE_SOFTMAX_LOG
+        t_helper = LogAddExp(t_helper, tmp);
+#else
+        t_helper += tmp;
+#endif
+
+        values[v_idx] = tmp;
+    }
+
+    l_helper[lid] = t_helper;
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    // Compute sum of 256 values (one for each thread)
+    // Logarithmic reduction to compute the sum
+    for(int i = (BATCH_SIZE >> 1); i > 0; i >>= 1)
+    {
+        if(batch_lid < i)
+        {
+            l_helper[lid]
+#if USE_SOFTMAX_LOG
+                = LogAddExp(l_helper[lid], l_helper[lid + i])
+#else
+                += l_helper[lid + i]
+#endif
+                ;
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    _FLOAT channel_sum = l_helper[batch * BATCH_SIZE];
+
+    // Normalize each value in the channel by the channel_sum
+    index = index0;
+    for(int i = batch_lid; i < vector_size; i += BATCH_SIZE, index++)
+    {
+        if(mad24(batch_n, vector_size, i) * spatial_dim + batch_s < vector_size * grid_size)
+        {
+#if !IS_INPUT_PACKED && USE_SOFTMAX_MODE_INSTANCE
+            int i0 = i / (INPUT_W * INPUT_H);
+            int i1 = (i % (INPUT_W * INPUT_H)) / INPUT_W;
+            int i2 = (i % (INPUT_W * INPUT_H)) % INPUT_W;
+#endif
+
+            int y_gidx = OUT_OFFSET;
+#if IS_OUTPUT_PACKED
+            y_gidx += mad24(batch_n, vector_size, i) * spatial_dim + batch_s;
+#else
+            y_gidx += batch_n * OUTPUT_N_STRIDE;
+#if USE_SOFTMAX_MODE_INSTANCE
+            y_gidx += i0 * OUTPUT_C_STRIDE + i1 * OUTPUT_H_STRIDE + i2;
+#else
+            y_gidx += i * OUTPUT_C_STRIDE + batch_s0 * OUTPUT_H_STRIDE + batch_s1;
+#endif
+#endif
+
+            int v_idx = index;
+#if MIOPEN_USE_FP16 == 1
+            v_idx += lid * U_BATCH_SIZE;
+#endif
+
+#if USE_SOFTMAX_LOG
+            values[v_idx] -= channel_sum;
+#else
+            values[v_idx] /= channel_sum;
+#endif
+
+#if USE_ALPHA
+            values[v_idx] *= ((_FLOAT)alpha);
+#endif
+
+#if USE_BETA
+            values[v_idx] += y[y_gidx] * ((_FLOAT)beta);
+#endif
+
+            y[y_gidx] = values[v_idx];
+        }
+    }
+
+#endif // CSR-Vector vs CSR-Stream
+}
+#endif
+
+#if !RUN_FORWARD
+__kernel void SoftmaxBackward(global _FLOAT* y,
+                              global _FLOAT* dy,
+                              global _FLOAT* dx,
+                              const int vector_size,
+                              const int grid_size,
+                              const int spatial_dim,
+#if !USE_ALPHA
+                              UNUSED
+#endif
+                              const float alpha,
+#if !USE_BETA
+                              UNUSED
+#endif
+                              const float beta)
+{
+
+#if NUM_BATCH == 1 // CSR-Vector like appraoch
+    local _FLOAT l_helper[256];
+
+    int gid = get_group_id(0);
+    int lid = get_local_id(0);
+
+    // Total number of workgroups launched can be less than the gridsize, hence iterate over.
+    for(gid = get_group_id(0); gid < grid_size; gid += get_num_groups(0))
+    {
+
+        int n = gid / spatial_dim; // nth image
+        int s = gid % spatial_dim; // spatial dimension (h*w)
+#if(!IS_DINPUT_PACKED || !IS_DOUTPUT_PACKED || !IS_OUTPUT_PACKED) && USE_SOFTMAX_MODE_CHANNEL
+        int s0 = s / INPUT_W;
+        int s1 = s % INPUT_W;
+#endif
+
+        _FLOAT channel_dot = (_FLOAT)0; // thread_local helper var
+
+        // Compute dot product per channel
+        // Iterate over all the channels one thread is supposed to loop over
+        // and compute dot-product
+        for(int i = lid; i < vector_size; i += get_local_size(0))
+        {
+#if(!IS_OUTPUT_PACKED || !IS_DOUTPUT_PACKED) && USE_SOFTMAX_MODE_INSTANCE
+            int i0 = i / (INPUT_W * INPUT_H);
+            int i1 = (i % (INPUT_W * INPUT_H)) / INPUT_W;
+            int i2 = (i % (INPUT_W * INPUT_H)) % INPUT_W;
+#endif
+
+            int y_gidx = OUT_OFFSET;
+#if IS_OUTPUT_PACKED
+            y_gidx += mad24(n, vector_size, i) * spatial_dim + s;
+#else
+            y_gidx += n * OUTPUT_N_STRIDE;
+#if USE_SOFTMAX_MODE_INSTANCE
+            y_gidx += i0 * OUTPUT_C_STRIDE + i1 * OUTPUT_H_STRIDE + i2;
+#else
+            y_gidx += i * OUTPUT_C_STRIDE + s0 * OUTPUT_H_STRIDE + s1;
+#endif
+#endif
+
+            int dy_gidx = DOUT_OFFSET;
+#if IS_DOUTPUT_PACKED
+            dy_gidx += mad24(n, vector_size, i) * spatial_dim + s;
+#else
+            dy_gidx += n * DOUTPUT_N_STRIDE;
+#if USE_SOFTMAX_MODE_INSTANCE
+            dy_gidx += i0 * DOUTPUT_C_STRIDE + i1 * DOUTPUT_H_STRIDE + i2;
+#else
+            dy_gidx += i * DOUTPUT_C_STRIDE + s0 * DOUTPUT_H_STRIDE + s1;
+#endif
+#endif
+
+            channel_dot += y[y_gidx] * dy[dy_gidx];
+        }
+
+        // Now we have to compute the sum from 256 values (one per each thread)
+        l_helper[lid] = channel_dot;
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // Logarithmic reduction to compute the sum.
+        for(int i = (get_local_size(0) >> 1); i > 0; i >>= 1)
+        {
+            if(lid < i)
+            {
+                l_helper[lid] += l_helper[lid + i];
+            }
+            barrier(CLK_LOCAL_MEM_FENCE);
+        }
+
+        channel_dot = l_helper[0];
+
+        // Subtract and element-wise multiplication
+        for(int i = lid; i < vector_size; i += get_local_size(0))
+        {
+#if((!USE_SOFTMAX_LOG && !IS_OUTPUT_PACKED) || !IS_DOUTPUT_PACKED || !IS_DINPUT_PACKED) && \
+    USE_SOFTMAX_MODE_INSTANCE
+            int i0 = i / (INPUT_W * INPUT_H);
+            int i1 = (i % (INPUT_W * INPUT_H)) / INPUT_W;
+            int i2 = (i % (INPUT_W * INPUT_H)) % INPUT_W;
+#endif
+
+            int dy_gidx = DOUT_OFFSET;
+#if IS_DOUTPUT_PACKED
+            dy_gidx += mad24(n, vector_size, i) * spatial_dim + s;
+#else
+            dy_gidx += n * DOUTPUT_N_STRIDE;
+#if USE_SOFTMAX_MODE_INSTANCE
+            dy_gidx += i0 * DOUTPUT_C_STRIDE + i1 * DOUTPUT_H_STRIDE + i2;
+#else
+            dy_gidx += i * DOUTPUT_C_STRIDE + s0 * DOUTPUT_H_STRIDE + s1;
+#endif
+#endif
+
+            _FLOAT value = dy[dy_gidx] - channel_dot;
+
+            int dx_gidx = DIN_OFFSET;
+#if IS_DINPUT_PACKED
+            dx_gidx += mad24(n, vector_size, i) * spatial_dim + s;
+#else
+            dx_gidx += n * DINPUT_N_STRIDE;
+#if USE_SOFTMAX_MODE_INSTANCE
+            dx_gidx += i0 * DINPUT_C_STRIDE + i1 * DINPUT_H_STRIDE + i2;
+#else
+            dx_gidx += i * DINPUT_C_STRIDE + s0 * DINPUT_H_STRIDE + s1;
+#endif
+#endif
+
+#if !USE_SOFTMAX_LOG
+            int y_gidx = OUT_OFFSET;
+#if IS_OUTPUT_PACKED
+            y_gidx += mad24(n, vector_size, i) * spatial_dim + s;
+#else
+            y_gidx += n * OUTPUT_N_STRIDE;
+#if USE_SOFTMAX_MODE_INSTANCE
+            y_gidx += i0 * OUTPUT_C_STRIDE + i1 * OUTPUT_H_STRIDE + i2;
+#else
+            y_gidx += i * OUTPUT_C_STRIDE + s0 * OUTPUT_H_STRIDE + s1;
+#endif
+#endif
+            value *= y[y_gidx];
+#endif
+
+#if USE_ALPHA
+            value *= alpha;
+#endif
+
+#if USE_BETA
+            value += dx[dx_gidx] * beta;
+#endif
+
+            dx[dx_gidx] = value;
+        }
+        (void)s;
+    }
+
+#else
+
+    local _FLOAT l_helper[256];
+
+    int gid = get_group_id(0);
+    int lid = get_local_id(0);
+
+    // ID of the thread within the batch
+    int batch_lid = lid & (BATCH_SIZE - 1); // thread specific channel_st
+    int batch     = lid / BATCH_SIZE;       // which spatial_dim or pixel
+
+    // Batch specific n and s
+    int batch_n        = (NUM_BATCH * gid + batch) / spatial_dim; // nth image
+    int batch_s        = (NUM_BATCH * gid + batch) % spatial_dim; // which spatial_dim/pixel
+#if(!IS_DINPUT_PACKED || !IS_DOUTPUT_PACKED || !IS_OUTPUT_PACKED) && USE_SOFTMAX_MODE_CHANNEL
+    int batch_s0       = batch_s / INPUT_W;
+    int batch_s1       = batch_s % INPUT_W;
+#endif
+    _FLOAT channel_dot = (_FLOAT)(0); // thread_local helper var
+
+// stores all the values touched by one thread so that we do not have load
+// again as the CSR-Vector approach
+#if MIOPEN_USE_FP16 == 1
+    local _FLOAT y_value[U_BATCH_SIZE * 256];
+    local _FLOAT dx_value[U_BATCH_SIZE * 256];
+#else
+    _FLOAT y_value[U_BATCH_SIZE];
+    _FLOAT dx_value[U_BATCH_SIZE];
+#endif
+
+    for(int i = 0; i < U_BATCH_SIZE; i++)
+    {
+#if MIOPEN_USE_FP16 == 1 // Refer to Comment1 above for different fp16 and fp32 impl
+        y_value[lid * U_BATCH_SIZE + i] = 0;
+        dx_value[lid * U_BATCH_SIZE + i] = 0;
+#else
+        y_value[i]  = 0;
+        dx_value[i] = 0;
+#endif
+    }
+
+    // Compute dot product per channel
+    // BATCH_SIZE threads iterate over the channels
+    int index0 = batch_lid / BATCH_SIZE;
+    int index  = index0;
+    for(int i = batch_lid; i < vector_size; i += BATCH_SIZE, index++)
+    {
+        if(mad24(batch_n, vector_size, i) * spatial_dim + batch_s < vector_size * grid_size)
+        {
+#if(!IS_OUTPUT_PACKED || !IS_DOUTPUT_PACKED) && USE_SOFTMAX_MODE_INSTANCE
+            int i0 = i / (INPUT_W * INPUT_H);
+            int i1 = (i % (INPUT_W * INPUT_H)) / INPUT_W;
+            int i2 = (i % (INPUT_W * INPUT_H)) % INPUT_W;
+#endif
+
+            int y_gidx = OUT_OFFSET;
+#if IS_OUTPUT_PACKED
+            y_gidx += mad24(batch_n, vector_size, i) * spatial_dim + batch_s;
+#else
+            y_gidx += batch_n * OUTPUT_N_STRIDE;
+#if USE_SOFTMAX_MODE_INSTANCE
+            y_gidx += i0 * OUTPUT_C_STRIDE + i1 * OUTPUT_H_STRIDE + i2;
+#else
+            y_gidx += i * OUTPUT_C_STRIDE + batch_s0 * OUTPUT_H_STRIDE + batch_s1;
+#endif
+#endif
+
+            int dy_gidx = DOUT_OFFSET;
+#if IS_DOUTPUT_PACKED
+            dy_gidx += mad24(batch_n, vector_size, i) * spatial_dim + batch_s;
+#else
+            dy_gidx += batch_n * DOUTPUT_N_STRIDE;
+#if USE_SOFTMAX_MODE_INSTANCE
+            dy_gidx += i0 * DOUTPUT_C_STRIDE + i1 * DOUTPUT_H_STRIDE + i2;
+#else
+            dy_gidx += i * DOUTPUT_C_STRIDE + batch_s0 * DOUTPUT_H_STRIDE + batch_s1;
+#endif
+#endif
+
+#if MIOPEN_USE_FP16 == 1
+            _FLOAT tmp1                          = y[y_gidx];
+            y_value[lid * U_BATCH_SIZE + index]  = tmp1;
+            _FLOAT tmp2                          = dy[dy_gidx];
+            dx_value[lid * U_BATCH_SIZE + index] = tmp2;
+            channel_dot += tmp1 * tmp2;
+#else
+            y_value[index]  = y[y_gidx];
+            dx_value[index] = dy[dy_gidx];
+            channel_dot += y_value[index] * dx_value[index];
+#endif
+        }
+    }
+
+    // Now we have to compute the sum from 256 values (one per each thread)
+    l_helper[lid] = channel_dot;
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    // Logarithmic reduction to compute the sum.
+    for(int i = (BATCH_SIZE >> 1); i > 0; i >>= 1)
+    {
+        if(batch_lid < i)
+        {
+            l_helper[lid] += l_helper[lid + i];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    channel_dot = l_helper[batch * BATCH_SIZE];
+
+    // Subtract and element-wise multiplication
+    index = index0;
+    for(int i = batch_lid; i < vector_size; i += BATCH_SIZE, index++)
+    {
+#if !IS_DINPUT_PACKED && USE_SOFTMAX_MODE_INSTANCE
+        int i0 = i / (INPUT_W * INPUT_H);
+        int i1 = (i % (INPUT_W * INPUT_H)) / INPUT_W;
+        int i2 = (i % (INPUT_W * INPUT_H)) % INPUT_W;
+#endif
+
+        int dx_gidx = DIN_OFFSET;
+#if IS_DINPUT_PACKED
+        dx_gidx += mad24(batch_n, vector_size, i) * spatial_dim + batch_s;
+#else
+        dx_gidx += batch_n * DINPUT_N_STRIDE;
+#if USE_SOFTMAX_MODE_INSTANCE
+        dx_gidx += i0 * DINPUT_C_STRIDE + i1 * DINPUT_H_STRIDE + i2;
+#else
+        dx_gidx += i * DINPUT_C_STRIDE + batch_s0 * DINPUT_H_STRIDE + batch_s1;
+#endif
+#endif
+
+        int v_idx = index;
+#if MIOPEN_USE_FP16 == 1
+        v_idx += lid * U_BATCH_SIZE;
+#endif
+
+        dx_value[v_idx] -= channel_dot;
+        if(mad24(batch_n, vector_size, i) * spatial_dim + batch_s < vector_size * grid_size)
+        {
+#if !USE_SOFTMAX_LOG
+            dx_value[v_idx] *= y_value[v_idx];
+#endif
+
+#if USE_ALPHA
+            dx_value[v_idx] *= alpha;
+#endif
+
+#if USE_BETA
+            dx_value[v_idx] += dx[dx_gidx] * beta;
+#endif
+
+            dx[dx_gidx] = dx_value[v_idx];
+        }
+    }
+
+#endif // CSR-Vector vs CSR-Stream
+}
+#endif
+      /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+typedef union
+{
+    uint u32;
+    ushort2 ushortx2;
+    float f32;
+} cvt_bf16_fp32_t;
+
+float bfloat16_to_float(ushort src_val)
+{
+    cvt_bf16_fp32_t target_val;
+    target_val.ushortx2 = (ushort2)(0, src_val);
+    return target_val.f32;
+}
+
+ushort float_to_bfloat16(float src_val)
+{
+    cvt_bf16_fp32_t target_val;
+    target_val.f32 = src_val;
+    // BF16 round and NaN preservation code matches
+    // https://github.com/ROCmSoftwarePlatform/rocBLAS/blob/develop/library/include/rocblas_bfloat16.h
+    if((~target_val.u32 & 0x7f800000) == 0) // Inf or NaN
+    {
+        // When all of the exponent bits are 1, the value is Inf or NaN.
+        // Inf is indicated by a zero mantissa. NaN is indicated by any nonzero
+        // mantissa bit. Quiet NaN is indicated by the most significant mantissa
+        // bit being 1. Signaling NaN is indicated by the most significant
+        // mantissa bit being 0 but some other bit(s) being 1. If any of the
+        // lower 16 bits of the mantissa are 1, we set the least significant bit
+        // of the bfloat16 mantissa, in order to preserve signaling NaN in case
+        // the bloat16's mantissa bits are all 0.
+        if((target_val.u32 & 0xffff) != 0)
+        {
+            target_val.u32 |= 0x10000; // Preserve signaling NaN
+        }
+    }
+    else
+    {
+#ifdef MIOPEN_USE_RNE_BFLOAT16
+        // When the exponent bits are not all 1s, then the value is zero, normal,
+        // or subnormal. We round the bfloat16 mantissa up by adding 0x7FFF, plus
+        // 1 if the least significant bit of the bfloat16 mantissa is 1 (odd).
+        // This causes the bfloat16's mantissa to be incremented by 1 if the 16
+        // least significant bits of the float mantissa are greater than 0x8000,
+        // or if they are equal to 0x8000 and the least significant bit of the
+        // bfloat16 mantissa is 1 (odd). This causes it to be rounded to even when
+        // the lower 16 bits are exactly 0x8000. If the bfloat16 mantissa already
+        // has the value 0x7f, then incrementing it causes it to become 0x00 and
+        // the exponent is incremented by one, which is the next higher FP value
+        // to the unrounded bfloat16 value. When the bfloat16 value is subnormal
+        // with an exponent of 0x00 and a mantissa of 0x7F, it may be rounded up
+        // to a normal value with an exponent of 0x01 and a mantissa of 0x00.
+        // When the bfloat16 value has an exponent of 0xFE and a mantissa of 0x7F,
+        // incrementing it causes it to become an exponent of 0xFF and a mantissa
+        // of 0x00, which is Inf, the next higher value to the unrounded value.
+        target_val.u32 +=
+            (0x7fff + (target_val.ushortx2.hi & 1)); // Round to nearest, round to even
+#else                                                // Truncation rounding
+// do nothing
+#endif
+    }
+    return target_val.ushortx2.hi;
+}
+
+
+#define PPCAT_NX(A, B) A##B
+#define PPCAT(A, B) PPCAT_NX(A, B)
+#define TWO 2
+#define FOUR 4
+#define EIGHT 8
+
+#if MIOPEN_USE_FP16 == 1
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#define _FLOAT half
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 2 /* sizeof is unavailable for preprocessor */
+#ifndef HALF_MAX
+#define MAX_VAL 65504 /* max value */
+#else
+#define MAX_VAL HALF_MAX
+#endif
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define _FLOAT float
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 4 /* sizeof is unavailable for preprocessor */
+#ifndef FLT_MAX
+#define MAX_VAL 3.402823466e+38F /* max value */
+#else
+#define MAX_VAL FLT_MAX
+#endif
+#endif
+#if MIOPEN_USE_BFP16 == 1
+#define _FLOAT ushort
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 2 /* sizeof is unavailable for preprocessor */
+#define MAX_VAL 0x7F7F /* max value */
+#endif
+
+#define _FLOAT2 PPCAT(_FLOAT, TWO)
+#define _FLOAT4 PPCAT(_FLOAT, FOUR)
+#define _FLOAT8 PPCAT(_FLOAT, EIGHT)
+
+#if MIOPEN_USE_FP16 == 1
+#define CVT_FLOAT2ACCUM(x) ((_FLOAT_ACCUM)(x))
+#define CVT_ACCUM2FLOAT(x) ((_FLOAT)(x))
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define CVT_FLOAT2ACCUM(x) ((_FLOAT_ACCUM)(x))
+#define CVT_ACCUM2FLOAT(x) ((_FLOAT)(x))
+#endif
+#if MIOPEN_USE_BFP16 == 1
+#define CVT_FLOAT2ACCUM(x) bfloat16_to_float(x)
+#define CVT_ACCUM2FLOAT(x) float_to_bfloat16(x)
+#endif
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wundef"
+#define UNUSED __attribute__((__unused__))
+
+#ifndef MLO_LARGE_MAP
+#define MLO_LARGE_MAP 0
+#endif
+
+#ifndef MLO_N_INPUTS_REMAINDER
+#define MLO_N_INPUTS_REMAINDER 0
+#endif
+
+#ifndef MLO_N_IN_TILES_PERSTACK
+#define MLO_N_IN_TILES_PERSTACK 0
+#endif
+
+#ifndef MLO_N_IN_CHNLS
+#define MLO_N_IN_CHNLS 0
+#endif
+
+void calculateXYPos(uint linPos, uint width, uint* __restrict x, uint* __restrict y)
+{
+    (*y) = (uint)((float)linPos * (1.0f / (float)width) + 0.00001f);
+    (*x) = linPos - mul24((*y), width);
+}
+
+uint calculateOffset(uint stride, uint x, uint y)
+{
+    uint ret = y * stride + x;
+    return (ret);
+}
+
+void readDataElem(uint linPos,
+                  __local _FLOAT* lcl_data,
+                  uint lcl_base,
+                  UNUSED uint lcl_height,
+                  uint lcl_width,
+                  uint lcl_stride,
+                  uint lcl_y,
+                  uint lcl_x,
+                  const __global _FLOAT* gbl_data,
+                  uint gbl_base,
+                  uint gbl_height,
+                  uint gbl_width,
+                  uint gbl_stride,
+                  uint gbl_y,
+                  uint gbl_x,
+                  bool vis,
+                  UNUSED bool debug)
+{
+    uint x, y;
+    calculateXYPos(linPos, lcl_width, &x, &y);
+    uint g_x      = x + gbl_x;
+    uint g_y      = y + gbl_y;
+    uint gbl_off0 = calculateOffset(gbl_stride, g_x, g_y);
+    uint gbl_off  = gbl_off0 + gbl_base;
+
+#if MLO_LARGE_MAP == 1
+    uint lcl_off = lcl_base + linPos;
+    (void)lcl_stride;
+    (void)lcl_x;
+    (void)lcl_y;
+#else
+    uint l_x     = x + lcl_x;
+    uint l_y     = y + lcl_y;
+    uint lcl_off = lcl_base + mad24(l_y, lcl_stride, l_x);
+#endif
+
+#if MLO_LARGE_MAP == 1
+    //	vis &= (g_x >= 0 && g_x < gbl_width && g_y >= 0 && g_y < gbl_height);
+    vis &= (g_x < gbl_width && g_y < gbl_height);
+#else
+    (void)gbl_width;
+    (void)gbl_height;
+#endif
+    gbl_off        = (vis) ? gbl_off : 0;
+    _FLOAT gbl_val = gbl_data[gbl_off];
+    gbl_val        = (vis) ? gbl_val : 0;
+
+    lcl_data[lcl_off] = gbl_val;
+}
+
+void readData(uint lcl_id,
+              uint size,
+              uint lcl_p_stride,
+              __local _FLOAT* lcl_data,
+              uint lcl_base,
+              uint lcl_height,
+              uint lcl_width,
+              uint lcl_stride,
+              uint lcl_y,
+              uint lcl_x,
+              const __global _FLOAT* gbl_data,
+              uint gbl_base,
+              uint gbl_height,
+              uint gbl_width,
+              uint gbl_stride,
+              uint gbl_y,
+              uint gbl_x,
+              bool vis,
+              bool debug)
+{
+
+    for(uint i = lcl_id; i < size; i += lcl_p_stride)
+    {
+        readDataElem(i,
+                     lcl_data,
+                     lcl_base,
+                     lcl_height,
+                     lcl_width,
+                     lcl_stride,
+                     lcl_y,
+                     lcl_x,
+                     gbl_data,
+                     gbl_base,
+                     gbl_height,
+                     gbl_width,
+                     gbl_stride,
+                     gbl_y,
+                     gbl_x,
+                     vis,
+                     debug);
+    }
+}
+
+void readDataVec2(uint lcl_id,
+                  uint size,
+                  uint lcl_p_stride,
+                  __local _FLOAT2* lcl_data,
+                  uint lcl_base,
+                  UNUSED uint lcl_height,
+                  uint lcl_width,
+#if MLO_LARGE_MAP != 1
+                  uint lcl_stride,
+                  uint lcl_y,
+                  uint lcl_x,
+#endif
+                  const __global _FLOAT* gbl_data,
+                  uint2 gbl_base,
+#if MLO_LARGE_MAP == 1
+                  uint gbl_height,
+                  uint gbl_width,
+#endif
+                  uint gbl_stride,
+                  uint gbl_y,
+                  uint gbl_x,
+                  bool visX,
+                  bool visY,
+#if MLO_N_INPUTS_REMAINDER <= MLO_N_IN_TILES_PERSTACK
+                  bool IsLast,
+#endif
+                  UNUSED bool debug)
+{
+
+    uint x, y;
+    for(uint i = lcl_id; i < size; i += lcl_p_stride)
+    {
+        bool lvisX = visX, lvisY = visY;
+        calculateXYPos(i, lcl_width, &x, &y);
+        uint g_x         = x + gbl_x;
+        uint g_y         = y + gbl_y;
+        uint gbl_off0    = calculateOffset(gbl_stride, g_x, g_y);
+        uint2 gbl_off_v2 = (uint2)(gbl_off0) + gbl_base;
+
+#if MLO_LARGE_MAP == 1
+        uint lcl_off = lcl_base + i;
+        lvisX &= (g_x < gbl_width && g_y < gbl_height);
+        lvisY &= (g_x < gbl_width && g_y < gbl_height);
+#else
+        uint l_x                      = x + lcl_x;
+        uint l_y                      = y + lcl_y;
+        uint lcl_off                  = lcl_base + mad24(l_y, lcl_stride, l_x);
+#endif
+        lcl_data[lcl_off].x = (lvisX) ? gbl_data[gbl_off_v2.x] : (_FLOAT)0;
+#if MLO_N_INPUTS_REMAINDER <= MLO_N_IN_TILES_PERSTACK
+        lcl_data[lcl_off].y = (IsLast) ? (_FLOAT)0 : ((lvisY) ? gbl_data[gbl_off_v2.y] : (_FLOAT)0);
+#else
+        lcl_data[lcl_off].y           = (lvisY) ? gbl_data[gbl_off_v2.y] : (_FLOAT)0;
+#endif
+    }
+}
+
+void readDataTile(__local _FLOAT* lcl_data,
+                  const __global _FLOAT* gbl_data,
+                  int tile_y,
+                  int tile_x,
+                  uint gbl_stride,
+                  uint gbl_base,
+                  uint lcl_stride,
+                  uint lcl_base,
+                  uint gbl_height,
+                  uint gbl_width,
+                  uint lcl_height,
+                  uint lcl_width,
+                  uint lcl_id1,
+                  uint lcl_id0,
+                  uint lcl_grp_sz1,
+                  uint lcl_grp_sz0,
+                  uint fltr_pad1,
+                  uint fltr_pad0,
+                  _FLOAT padding_val)
+{
+    for(uint j = lcl_id1; j < lcl_height; j += lcl_grp_sz1)
+    {
+        int y_act       = (j - fltr_pad1);
+        bool invisibleY = (tile_y + y_act < 0) || (tile_y + y_act >= gbl_height);
+
+        uint y_gbl_off = y_act * gbl_stride + gbl_base;
+
+        uint y_lcl_off = j * lcl_stride + lcl_base;
+
+        for(uint i = lcl_id0; i < lcl_width; i += lcl_grp_sz0)
+        {
+            int x_act       = (i - fltr_pad0);
+            bool invisibleX = (tile_x + x_act < 0) || (tile_x + x_act >= gbl_width);
+
+            bool invis = invisibleX || invisibleY;
+
+            uint g_off = (invis) ? 0 : y_gbl_off + x_act;
+
+            _FLOAT val = gbl_data[g_off];
+
+            val = (invis) ? padding_val : val;
+
+            lcl_data[y_lcl_off + i] = val;
+        }
+    }
+}
+
+void readDataTileVec2(__local _FLOAT2* lcl_data,
+                      const __global _FLOAT* gbl_data,
+                      int tile_y,
+                      int tile_x,
+                      uint gbl_stride,
+                      uint2 gbl_base,
+                      uint lcl_stride,
+                      uint lcl_base,
+                      uint gbl_height,
+                      uint gbl_width,
+                      uint lcl_height,
+                      uint lcl_width,
+                      uint lcl_id1,
+                      uint lcl_id0,
+                      uint lcl_grp_sz1,
+                      uint lcl_grp_sz0,
+                      uint fltr_pad1,
+                      uint fltr_pad0,
+#if MLO_N_IN_CHNLS % 2 == 1
+                      bool IsLast,
+#endif
+                      _FLOAT padding_val)
+{
+    for(uint j = lcl_id1; j < lcl_height; j += lcl_grp_sz1)
+    {
+        int y_act          = (j - fltr_pad1);
+        bool invisibleY    = (tile_y + y_act < 0) || (tile_y + y_act >= gbl_height);
+        uint2 y_gbl_off_v2 = (uint2)(y_act * gbl_stride) + gbl_base;
+        uint y_lcl_off     = j * lcl_stride + lcl_base;
+        for(uint i = lcl_id0; i < lcl_width; i += lcl_grp_sz0)
+        {
+            int x_act       = (i - fltr_pad0);
+            bool invisibleX = (tile_x + x_act < 0) || (tile_x + x_act >= gbl_width);
+            bool invis      = invisibleX || invisibleY;
+            uint2 g_off     = (invis) ? (uint2)(0) : y_gbl_off_v2 + (uint2)(x_act);
+#if MLO_N_IN_CHNLS % 2 == 0
+            lcl_data[y_lcl_off + i] =
+                (invis) ? (_FLOAT2)(padding_val) : (_FLOAT2)(gbl_data[g_off.x], gbl_data[g_off.y]);
+#else
+            lcl_data[y_lcl_off + i].x = (invis) ? padding_val : gbl_data[g_off.x];
+            lcl_data[y_lcl_off + i].y =
+                (IsLast) ? (_FLOAT)0 : (invis) ? padding_val : gbl_data[g_off.y];
+#endif
+        }
+    }
+}
+
+void loadData(uint lcl_id,
+              uint lcl_p_stride,
+              __local _FLOAT* lcl_data,
+              uint lcl_off,
+              uint lcl_size,
+              uint lcl_height,
+              uint lcl_width,
+              uint lcl_stride,
+              uint lcl_bot_y,
+              uint lcl_bot_x,
+              const __global _FLOAT* gbl_data,
+              uint gbl_off,
+              uint gbl_size,
+              uint gbl_height,
+              uint glb_width,
+              uint gbl_stride,
+              uint gbl_bot_y,
+              uint gbl_bot_x,
+              uint buf_block_ind,
+              uint max_n_bufs,
+              uint lcl_n_bufs,
+              bool debug)
+{
+
+    for(uint c = 0; c < lcl_n_bufs; ++c, lcl_off += lcl_size, gbl_off += gbl_size)
+    {
+        bool vis = (buf_block_ind + c < max_n_bufs);
+        readData(lcl_id,
+                 lcl_size,
+                 lcl_p_stride,
+                 lcl_data,
+                 lcl_off,
+    

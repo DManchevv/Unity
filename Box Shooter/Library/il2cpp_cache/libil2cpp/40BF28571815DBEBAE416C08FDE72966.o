@@ -1,0 +1,2090 @@
+ (lcl_wave_id >> MLO_LG2_WAVE_SZ0);
+    *lcl_wave_id0   = lcl_wave_id - ((*lcl_wave_id1) << MLO_LG2_WAVE_SZ0);
+    return (lcl_wave_id);
+}
+
+static inline int getLocalIds(int* lcl_id1, int* lcl_id0)
+{
+    int lcl_wave_id = getWaveLocalId();
+    int wave_id     = getWaveId();
+    int lcl_id      = (wave_id << MLO_LG2_WAVE_SZ) + lcl_wave_id; // get_local_id(0);
+    *lcl_id1        = (lcl_id >> MLO_LG2ALU_EXTENT_X);
+    *lcl_id0        = lcl_id - ((*lcl_id1) << MLO_LG2ALU_EXTENT_X);
+    return (lcl_id);
+}
+
+/*********************************************************************************************************
+
+**********************************************************************************************************/
+
+__attribute__((reqd_work_group_size(MLO_GRP_SZ0, MLO_GRP_SZ1, MLO_GRP_SZ2))) __kernel void
+MIOpenCvD3x3_WSR0(const __global _FLOAT* __restrict in_ptr,
+                  const __global _FLOAT* __restrict wei_ptr,
+#if MLO_CONV_BIAS
+                  const __global _FLOAT* __restrict bias,
+#endif
+                  __global _FLOAT* __restrict out_ptr,
+                  UNUSED _FLOAT alpha // LRU fusion
+                  )
+{
+    // all other allocation should be before this one since we may exceed lcl mem range
+    __local _FLOAT in_lcl[MLO_IN_LCL_WIDTH * (MLO_OUT_EXTENT1 + 2 * MLO_FILTER_PAD1)];
+
+    __private _FLOAT_ACCUM pvt_accum[MLO_N_LCL_OUT_MAPS * MLO_OUT_TILE1 * MLO_OUT_TILE0];
+
+    int grp_input_id   = get_group_id(0); // tile id inside the input map
+    int grp_gbl_offset = (grp_input_id == 0)
+                             ? 0
+                             : (grp_input_id * MLO_OUT_EXTENT1 - MLO_FILTER_PAD1) * MLO_IN_STRIDE;
+    int gpr_lcl_off = (grp_input_id != 0) ? MLO_FILTER_PAD0
+                                          : MLO_IN_LCL_WIDTH * MLO_FILTER_PAD1 + MLO_FILTER_PAD0;
+
+    int lcl_id1;
+    int lcl_id0;
+    int lcl_id = getLocalIds(&lcl_id1, &lcl_id0);
+    grp_gbl_offset += lcl_id1 * MLO_IN_STRIDE;
+    gpr_lcl_off += lcl_id1 * MLO_IN_LCL_WIDTH;
+
+    int n_vert_reads = (grp_input_id == 0) ? (MLO_OUT_EXTENT1 + MLO_FILTER_PAD1)
+                                           : (MLO_OUT_EXTENT1 + 2 * MLO_FILTER_PAD1);
+    n_vert_reads = (grp_input_id == (get_num_groups(0) - 1))
+                       ? (MLO_IN_HEIGHT - grp_input_id * MLO_OUT_EXTENT1 + MLO_FILTER_PAD1)
+                       : n_vert_reads;
+
+    // output
+    int o_block = get_group_id(1);
+
+    int weave_id = getWaveId();
+    // assumption is MLO_N_OUTPUTS is multiple of MLO_N_LCL_OUT_MAPS*MLO_N_WAVES
+    int o_base = o_block * MLO_N_LCL_OUT_MAPS * MLO_N_WAVES + weave_id * MLO_N_LCL_OUT_MAPS;
+
+    __private int weights_base_offsets[MLO_N_LCL_OUT_MAPS];
+
+    for(uint i = 0; i < MLO_N_LCL_OUT_MAPS; ++i)
+    {
+        weights_base_offsets[i] = (o_base + i) * MLO_WEI_BATCH_STRIDE;
+    }
+
+    // batch
+    int b_block = get_group_id(2);
+    // batch
+    int b_base = b_block * MLO_N_LCL_BATCHS;
+
+    grp_gbl_offset += b_base * MLO_IN_BATCH_STRIDE;
+
+    // padding
+
+    for(uint i = lcl_id; i < MLO_IN_LCL_WIDTH * (MLO_OUT_EXTENT1 + 2 * MLO_FILTER_PAD1);
+        i += MLO_GRP_SZ)
+    {
+        in_lcl[i] = 0;
+    }
+
+    // local read and relative output adresses and offsets
+    int lcl_wave_id1;
+    int lcl_wave_id0;
+    getWaveLocalIds(&lcl_wave_id1, &lcl_wave_id0);
+    int lcl_off1     = lcl_wave_id1 * MLO_OUT_TILE1;
+    int lcl_off0     = lcl_wave_id0 * MLO_OUT_TILE0;
+    int lcl_read_off = lcl_off1 * MLO_IN_LCL_WIDTH + lcl_off0;
+
+    for(uint i = 0; i < MLO_N_LCL_OUT_MAPS * MLO_OUT_TILE1 * MLO_OUT_TILE0; ++i)
+    {
+        pvt_accum[i] = (_FLOAT_ACCUM)0;
+    }
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+#if 0
+
+	if (get_group_id(0) == 0 && lcl_id0 == 1)
+	{
+		printf("k:s: %d %d %d %d %d\n",
+			getWaveId(),
+			lcl_id,
+			lcl_id1,
+			grp_gbl_offset,
+			gpr_lcl_off
+		);
+	}
+#endif
+
+    // outer loop over all input maps
+    for(uint c = 0, wei_offset = 0; c < MLO_N_INPUTS;
+        ++c, grp_gbl_offset += MLO_IN_CHANNEL_STRIDE, wei_offset += MLO_WEI_CHANNEL_STRIDE)
+    {
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // this kernel assumes with is multiple of MLO_READ_UNIT
+        // number of inputs has been guarded above
+
+        int gbl_scan_off = grp_gbl_offset;
+        int lcl_scan_off = gpr_lcl_off;
+        for(uint j = lcl_id1; j < n_vert_reads; j += MLO_ALU_EXTENT_Y,
+                 gbl_scan_off += MLO_IN_STRIDE * MLO_ALU_EXTENT_Y,
+                 lcl_scan_off += MLO_IN_LCL_WIDTH * MLO_ALU_EXTENT_Y)
+        {
+            for(int k = 0; k < MLO_READ_UNIT; ++k)
+            {
+                in_lcl[lcl_scan_off + lcl_id0 * MLO_READ_UNIT + k] =
+                    in_ptr[gbl_scan_off + lcl_id0 * MLO_READ_UNIT + k];
+            }
+#if 0
+
+			if (get_group_id(0) == 0 && j < 3 && lcl_id0 == 0)
+			{
+				printf("k:i: %d %d %d  %f %f %f\n",
+					n_vert_reads,
+					lcl_scan_off + lcl_id0*MLO_READ_UNIT,
+					gbl_scan_off + lcl_id0*MLO_READ_UNIT,
+					in_lcl[lcl_scan_off - 1], in_lcl[lcl_scan_off + lcl_id0*MLO_READ_UNIT], in_lcl[lcl_scan_off + lcl_id0*MLO_READ_UNIT + 1]
+				);
+			}
+#endif
+        }
+        // finish reading
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // read weights
+        __private _FLOAT pvt_wei_stage[MLO_N_LCL_OUT_MAPS * MLO_FILTER_SIZE0 * MLO_FILTER_SIZE0];
+        for(uint j = 0; j < MLO_N_LCL_OUT_MAPS; ++j)
+        {
+            for(uint i = 0; i < MLO_WEI_CHANNEL_STRIDE; ++i)
+            {
+                int wei_gbl_off = weights_base_offsets[j] + wei_offset;
+
+#if MLO_OUTPUTS_ALIGNED == 0
+                if(o_base + j >= MLO_N_OUTPUTS)
+                {
+                    pvt_wei_stage[j * MLO_WEI_CHANNEL_STRIDE + i] = 0;
+                }
+                else
+#endif
+                {
+                    pvt_wei_stage[j * MLO_WEI_CHANNEL_STRIDE + i] = wei_ptr[wei_gbl_off + i];
+                }
+            }
+        }
+
+        // read data
+        __private _FLOAT pvt_in_stage[(MLO_OUT_TILE1 + 2 * MLO_FILTER_PAD1) *
+                                      (MLO_OUT_TILE0 + 2 * MLO_FILTER_PAD0)];
+
+        int lcl_read_scan_off = lcl_read_off;
+        for(uint j = 0; j < (MLO_OUT_TILE1 + 2 * MLO_FILTER_PAD1);
+            ++j, lcl_read_scan_off += MLO_IN_LCL_WIDTH)
+        {
+            for(uint i = 0; i < (MLO_OUT_TILE0 + 2 * MLO_FILTER_PAD0); ++i)
+            {
+                pvt_in_stage[j * (MLO_OUT_TILE0 + 2 * MLO_FILTER_PAD0) + i] =
+                    in_lcl[lcl_read_scan_off + i];
+            }
+        }
+
+        // actual conv
+
+        for(uint oc = 0; oc < MLO_N_LCL_OUT_MAPS; ++oc)
+        {
+            for(uint j = 0; j < MLO_OUT_TILE1; ++j)
+            {
+                for(uint i = 0; i < MLO_OUT_TILE0; ++i)
+                {
+                    for(uint k = 0; k < MLO_FILTER_SIZE1; ++k)
+                    {
+                        for(uint l = 0; l < MLO_FILTER_SIZE0; ++l)
+                        {
+
+                            pvt_accum[(oc * MLO_OUT_TILE1 + j) * MLO_OUT_TILE0 + i] +=
+                                CVT_FLOAT2ACCUM(
+                                    pvt_in_stage[(j + k) * (MLO_OUT_TILE0 + 2 * MLO_FILTER_PAD0) +
+                                                 i + l]) *
+                                CVT_FLOAT2ACCUM(pvt_wei_stage[oc * MLO_WEI_CHANNEL_STRIDE +
+                                                              k * MLO_FILTER_SIZE0 + l]);
+#if 0
+
+							if (get_group_id(0) == 0 && lcl_id == 0 && j == 0 && i == 0)
+							{
+								printf("k:c: %d %d %d  %f %f %f\n",
+									oc,
+									k,
+									l,
+									pvt_accum[(oc * MLO_OUT_TILE1 + j) * MLO_OUT_TILE0 + i],
+									pvt_in_stage[(j + k) * (MLO_OUT_TILE0 + 2 * MLO_FILTER_PAD0) + i + l],
+									pvt_wei_stage[oc * MLO_WEI_CHANNEL_STRIDE + k * MLO_FILTER_SIZE0 + l]
+								);
+							}
+#endif
+
+                        } // for (int l = 0; l < MLO_FILTER_SIZE0; ++l)
+                    }
+
+                } // for (int i = 0; i < MLO_OUT_TILE0; ++i)
+
+            } // for (int j = 0; j < MLO_OUT_TILE1; ++j)
+        }
+    }
+
+    // send it out
+    // TODO: batch loop
+
+    int grp_x   = 0;
+    int grp_y   = grp_input_id * MLO_OUT_EXTENT1;
+    int out_off = b_base * MLO_OUT_BATCH_STRIDE + o_base * MLO_OUT_CHANNEL_STRIDE +
+                  (grp_y + lcl_off1) * MLO_OUT_STRIDE + grp_x + lcl_off0;
+
+    int out_off1 = out_off;
+    for(uint oc = 0; oc < MLO_N_LCL_OUT_MAPS; ++oc, out_off1 += MLO_OUT_CHANNEL_STRIDE)
+    {
+#if MLO_OUTPUTS_ALIGNED == 0
+        if(o_base + oc < MLO_N_OUTPUTS)
+#endif
+        {
+            int out_off2 = out_off1;
+            for(uint j = 0; j < MLO_OUT_TILE1; ++j, out_off2 += MLO_OUT_STRIDE)
+            {
+                // input height == output heiht
+                if(grp_y + lcl_off1 + j < MLO_IN_HEIGHT)
+                {
+                    for(uint i = 0; i < MLO_OUT_TILE0 / MLO_READ_UNIT; ++i)
+                    {
+                        int gbl_out_off = out_off2 + i * MLO_READ_UNIT;
+                        for(int k = 0; k < MLO_READ_UNIT; ++k)
+                        {
+                            out_ptr[gbl_out_off + k] = CVT_ACCUM2FLOAT(
+                                pvt_accum[/*ib*MLO_N_LCL_OUT_MAPS * MLO_OUT_TILE_SZ + */ (
+                                              oc * MLO_OUT_TILE1 + j) *
+                                              MLO_OUT_TILE0 +
+                                          i * MLO_READ_UNIT + k]);
+#if DBG_OUT_OF_RNGE
+                            if(gbl_out_off + k > MLO_OUT_BATCH_STRIDE * MLO_BATCH_SZ)
+                            {
+                                printf("k:err:out-of-range\n");
+                            }
+#endif
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+         /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+typedef union
+{
+    uint u32;
+    ushort2 ushortx2;
+    float f32;
+} cvt_bf16_fp32_t;
+
+float bfloat16_to_float(ushort src_val)
+{
+    cvt_bf16_fp32_t target_val;
+    target_val.ushortx2 = (ushort2)(0, src_val);
+    return target_val.f32;
+}
+
+ushort float_to_bfloat16(float src_val)
+{
+    cvt_bf16_fp32_t target_val;
+    target_val.f32 = src_val;
+    // BF16 round and NaN preservation code matches
+    // https://github.com/ROCmSoftwarePlatform/rocBLAS/blob/develop/library/include/rocblas_bfloat16.h
+    if((~target_val.u32 & 0x7f800000) == 0) // Inf or NaN
+    {
+        // When all of the exponent bits are 1, the value is Inf or NaN.
+        // Inf is indicated by a zero mantissa. NaN is indicated by any nonzero
+        // mantissa bit. Quiet NaN is indicated by the most significant mantissa
+        // bit being 1. Signaling NaN is indicated by the most significant
+        // mantissa bit being 0 but some other bit(s) being 1. If any of the
+        // lower 16 bits of the mantissa are 1, we set the least significant bit
+        // of the bfloat16 mantissa, in order to preserve signaling NaN in case
+        // the bloat16's mantissa bits are all 0.
+        if((target_val.u32 & 0xffff) != 0)
+        {
+            target_val.u32 |= 0x10000; // Preserve signaling NaN
+        }
+    }
+    else
+    {
+#ifdef MIOPEN_USE_RNE_BFLOAT16
+        // When the exponent bits are not all 1s, then the value is zero, normal,
+        // or subnormal. We round the bfloat16 mantissa up by adding 0x7FFF, plus
+        // 1 if the least significant bit of the bfloat16 mantissa is 1 (odd).
+        // This causes the bfloat16's mantissa to be incremented by 1 if the 16
+        // least significant bits of the float mantissa are greater than 0x8000,
+        // or if they are equal to 0x8000 and the least significant bit of the
+        // bfloat16 mantissa is 1 (odd). This causes it to be rounded to even when
+        // the lower 16 bits are exactly 0x8000. If the bfloat16 mantissa already
+        // has the value 0x7f, then incrementing it causes it to become 0x00 and
+        // the exponent is incremented by one, which is the next higher FP value
+        // to the unrounded bfloat16 value. When the bfloat16 value is subnormal
+        // with an exponent of 0x00 and a mantissa of 0x7F, it may be rounded up
+        // to a normal value with an exponent of 0x01 and a mantissa of 0x00.
+        // When the bfloat16 value has an exponent of 0xFE and a mantissa of 0x7F,
+        // incrementing it causes it to become an exponent of 0xFF and a mantissa
+        // of 0x00, which is Inf, the next higher value to the unrounded value.
+        target_val.u32 +=
+            (0x7fff + (target_val.ushortx2.hi & 1)); // Round to nearest, round to even
+#else                                                // Truncation rounding
+// do nothing
+#endif
+    }
+    return target_val.ushortx2.hi;
+}
+
+
+#define PPCAT_NX(A, B) A##B
+#define PPCAT(A, B) PPCAT_NX(A, B)
+#define TWO 2
+#define FOUR 4
+#define EIGHT 8
+
+#if MIOPEN_USE_FP16 == 1
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#define _FLOAT half
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 2 /* sizeof is unavailable for preprocessor */
+#ifndef HALF_MAX
+#define MAX_VAL 65504 /* max value */
+#else
+#define MAX_VAL HALF_MAX
+#endif
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define _FLOAT float
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 4 /* sizeof is unavailable for preprocessor */
+#ifndef FLT_MAX
+#define MAX_VAL 3.402823466e+38F /* max value */
+#else
+#define MAX_VAL FLT_MAX
+#endif
+#endif
+#if MIOPEN_USE_BFP16 == 1
+#define _FLOAT ushort
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 2 /* sizeof is unavailable for preprocessor */
+#define MAX_VAL 0x7F7F /* max value */
+#endif
+
+#define _FLOAT2 PPCAT(_FLOAT, TWO)
+#define _FLOAT4 PPCAT(_FLOAT, FOUR)
+#define _FLOAT8 PPCAT(_FLOAT, EIGHT)
+
+#if MIOPEN_USE_FP16 == 1
+#define CVT_FLOAT2ACCUM(x) ((_FLOAT_ACCUM)(x))
+#define CVT_ACCUM2FLOAT(x) ((_FLOAT)(x))
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define CVT_FLOAT2ACCUM(x) ((_FLOAT_ACCUM)(x))
+#define CVT_ACCUM2FLOAT(x) ((_FLOAT)(x))
+#endif
+#if MIOPEN_USE_BFP16 == 1
+#define CVT_FLOAT2ACCUM(x) bfloat16_to_float(x)
+#define CVT_ACCUM2FLOAT(x) float_to_bfloat16(x)
+#endif
+
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+uint iDiv_legacy(uint v, uint d)
+{
+    uint r = (uint)((float)v * (1.0f / (float)d) + 0.00001f);
+    return (r);
+}
+
+uint iDiv(uint v, uint d)
+{
+    uint r = v / d;
+    return (r);
+}
+
+uint iMod(uint v, uint u, uint d)
+{
+    uint r = v - mul24((uint)u, (uint)d);
+    return (r);
+}
+
+
+#define MLO_OUT_CHANNEL_STRIDE_ALIGNED (MLO_OUT_CHANNEL_STRIDE / MLO_WRITE_UNIT)
+#define MLO_OUT_STRIDE_ALIGNED (MLO_OUT_STRIDE / MLO_WRITE_UNIT)
+
+#define MLO_IN_CHANNEL_STRIDE_ALIGNED (MLO_IN0_CHANNEL_STRIDE / MLO_WRITE_UNIT)
+#define MLO_IN_STRIDE_ALIGNED (MLO_IN0_STRIDE / MLO_WRITE_UNIT)
+
+#ifndef DATA_TYPE
+#define DATA_TYPE _FLOAT
+#endif
+
+__attribute__((reqd_work_group_size(MLO_GRP0_SZ0, MLO_GRP0_SZ1, MLO_GRP0_SZ2))) __kernel void
+SubSample(const __global DATA_TYPE* __restrict in, __global DATA_TYPE* __restrict out)
+{
+    uint stack_pos = get_global_id(0);
+    uint batch_id  = get_global_id(1);
+    uint map_id    = iDiv(stack_pos, MLO_OUT_CHANNEL_STRIDE_ALIGNED);
+    uint pix_pos   = iMod(stack_pos, map_id, MLO_OUT_CHANNEL_STRIDE_ALIGNED);
+    uint out_y     = iDiv(pix_pos, MLO_OUT_STRIDE_ALIGNED);
+    uint out_x     = iMod(pix_pos, out_y, MLO_OUT_STRIDE_ALIGNED) * MLO_WRITE_UNIT;
+
+    uint out_off = batch_id * MLO_IN_BATCH_STRIDE + stack_pos * MLO_WRITE_UNIT;
+    uint in_y    = out_y * MLO_FILTER0_STRIDE1;
+    uint in_x    = out_x * MLO_FILTER0_STRIDE0;
+    uint in_off  = batch_id * MLO_IN0_BATCH_STRIDE + map_id * MLO_IN0_CHANNEL_STRIDE +
+                  in_y * MLO_IN0_STRIDE + in_x;
+
+    const __global DATA_TYPE* in_ptr = &in[in_off];
+    __global DATA_TYPE* out_ptr      = &out[out_off];
+
+    for(uint i = 0; i < MLO_WRITE_UNIT; ++i, in_ptr += MLO_FILTER0_STRIDE0, out_ptr++)
+    {
+        *out_ptr = *in_ptr;
+    }
+}
+
+__attribute__((reqd_work_group_size(MLO_GRP0_SZ0, MLO_GRP0_SZ1, MLO_GRP0_SZ2))) __kernel void
+UpSample(const __global DATA_TYPE* __restrict in, __global DATA_TYPE* __restrict out)
+{
+    uint stack_pos = get_global_id(0);
+    uint batch_id  = get_global_id(1);
+    uint map_id    = iDiv(stack_pos, MLO_IN_CHANNEL_STRIDE_ALIGNED);
+    uint pix_pos   = iMod(stack_pos, map_id, MLO_IN_CHANNEL_STRIDE_ALIGNED);
+    uint in_y      = iDiv(pix_pos, MLO_IN_STRIDE_ALIGNED);
+    uint in_x      = iMod(pix_pos, in_y, MLO_IN_STRIDE_ALIGNED) * MLO_WRITE_UNIT;
+
+    uint in_off  = batch_id * MLO_IN_BATCH_STRIDE + stack_pos * MLO_WRITE_UNIT;
+    uint out_y   = in_y * MLO_FILTER0_STRIDE1;
+    uint out_x   = in_x * MLO_FILTER0_STRIDE0;
+    uint out_off = batch_id * MLO_IN0_BATCH_STRIDE + map_id * MLO_OUT_CHANNEL_STRIDE +
+                   out_y * MLO_OUT_STRIDE + out_x;
+
+    const __global DATA_TYPE* in_ptr = &in[in_off];
+    __global DATA_TYPE* out_ptr      = &out[out_off];
+
+    for(uint i = 0; i < MLO_WRITE_UNIT; ++i, in_ptr++, out_ptr += MLO_FILTER0_STRIDE0)
+    {
+        *out_ptr = *in_ptr;
+    }
+}
+        /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ */
+
+#ifndef MIOPEN_USE_FP32
+#define MIOPEN_USE_FP32 0
+#endif
+
+#ifndef MIOPEN_USE_FP16
+#define MIOPEN_USE_FP16 0
+#endif
+
+#ifndef MIOPEN_USE_BFP16
+#define MIOPEN_USE_BFP16 0
+#endif
+
+#ifndef MIOPEN_USE_INT8
+#define MIOPEN_USE_INT8 0
+#endif
+
+#ifndef MIOPEN_USE_INT8x4
+#define MIOPEN_USE_INT8x4 0
+#endif
+
+#ifndef MIOPEN_USE_INT32
+#define MIOPEN_USE_INT32 0
+#endif
+
+#if MIOPEN_USE_INT8
+typedef char data_t;
+#elif MIOPEN_USE_INT8x4
+typedef uint data_t;
+#elif MIOPEN_USE_INT32
+typedef int data_t;
+#elif(MIOPEN_USE_FP16 || MIOPEN_USE_BFP16)
+// As the half type degrades the performance, use short instead of half in
+// transpose kernels, which have no match op. May change back to half when
+// compile can deliver equal performance as short
+typedef short data_t;
+#elif MIOPEN_USE_FP32
+typedef float data_t;
+#endif
+
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+uint iDiv_legacy(uint v, uint d)
+{
+    uint r = (uint)((float)v * (1.0f / (float)d) + 0.00001f);
+    return (r);
+}
+
+uint iDiv(uint v, uint d)
+{
+    uint r = v / d;
+    return (r);
+}
+
+uint iMod(uint v, uint u, uint d)
+{
+    uint r = v - mul24((uint)u, (uint)d);
+    return (r);
+}
+
+
+#ifndef NC_TRANS_NCHW_OPT
+#define NC_TRANS_NCHW_OPT 0
+#endif
+
+#ifndef NC_TRANS_CNHW_OPT
+#define NC_TRANS_CNHW_OPT 0
+#endif
+
+#ifndef NC_TRANS_NCHW
+#define NC_TRANS_NCHW 0
+#endif
+
+#ifndef NC_TRANS_CNHW
+#define NC_TRANS_CNHW 0
+#endif
+
+#ifndef NC_TRANS_MN2NM
+#define NC_TRANS_MN2NM 0
+#endif
+
+#ifndef IS_2D_WG
+#define IS_2D_WG 0
+#endif
+
+// N - batch size
+// C - # of maps
+// H - map height
+// W - map width
+
+// RD_BLCK = ((H*W)%8==0) ? 8 : ((H*W)%4==0) ? 4 : ((H*W)%3==0)? 3 : ((H*W)%2==0)? 2 : 1;
+// HW_RD = (H*W)/RD_BLCK
+// MAP_RD = HW_RD*C
+
+// lcl size0 = ((MAP_RD + 63)/64 < 8) ? ((MAP_RD + 63)/64)*64 : 512;
+// local size = (lcl size0, 1, 1)
+// global size = (MAP_RD, N, 1)
+
+#if NC_TRANS_NCHW_OPT
+__kernel void transpose_NCHW2CNHW_opt(const global data_t* in, global data_t* out)
+{
+    // to reduce granularity loss
+    uint c_p_blck = get_global_id(0);
+    uint c        = iDiv(c_p_blck, HW_RD);
+    uint p_blck   = iMod(c_p_blck, c, HW_RD);
+
+    uint in_off                 = c_p_blck * RD_BLCK + IN_OFF;
+    uint out_off                = c * N * H * W + p_blck * RD_BLCK + OUT_OFF;
+    const global READ_TYPE* cin = (const global READ_TYPE*)(in + in_off);
+    global READ_TYPE* cout      = (global READ_TYPE*)(out + out_off);
+
+    int b;
+#if IS_2D_WG
+    b               = get_global_id(1);
+    cout[b * HW_RD] = cin[b * C * HW_RD];
+#else
+    for(b = 0; b < N; b++)
+    {
+        cout[b * HW_RD] = cin[b * C * HW_RD];
+    }
+#endif
+}
+#endif
+
+#if NC_TRANS_CNHW_OPT
+__kernel void transpose_CNHW2NCHW_opt(const global data_t* in, global data_t* out)
+{
+    // to reduce granularity loss
+    uint c_p_blck = get_global_id(0);
+    uint c        = iDiv(c_p_blck, HW_RD);
+    uint p_blck   = iMod(c_p_blck, c, HW_RD);
+
+    uint in_off                 = c * N * H * W + p_blck * RD_BLCK + IN_OFF;
+    uint out_off                = c_p_blck * RD_BLCK + OUT_OFF;
+    const global READ_TYPE* cin = (const global READ_TYPE*)(in + in_off);
+    global READ_TYPE* cout      = (global READ_TYPE*)(out + out_off);
+
+    int b;
+#if IS_2D_WG
+    b                   = get_global_id(1);
+    cout[b * C * HW_RD] = cin[b * HW_RD];
+#else
+    for(b = 0; b < N; b++)
+    {
+        cout[b * C * HW_RD] = cin[b * HW_RD];
+    }
+#endif
+}
+#endif
+
+#if NC_TRANS_NCHW
+__kernel void transpose_NCHW2CNHW(const global data_t* in, global data_t* out)
+{
+    uint i = get_global_id(0);
+
+    uint c_i  = iDiv(i, HW_OUT);
+    uint hw_i = iMod(i, c_i, HW_OUT);
+    uint h_i  = iDiv(hw_i, W_OUT);
+    uint w_i  = iMod(hw_i, h_i, W_OUT);
+
+    uint in_off              = c_i * HW_IN + h_i * H_STRIDE * W_IN + w_i * W_STRIDE + IN_OFF;
+    uint out_off             = c_i * N * HW_OUT + hw_i + OUT_OFF;
+    const global data_t* cin = (const global data_t*)(in + in_off);
+    global data_t* cout      = (global data_t*)(out + out_off);
+
+    uint n_i;
+#if IS_2D_WG
+    n_i                = get_global_id(1);
+    cout[HW_OUT * n_i] = cin[C * HW_IN * n_i];
+#else
+    for(n_i                = 0; n_i < N; n_i++)
+        cout[HW_OUT * n_i] = cin[C * HW_IN * n_i];
+#endif
+}
+#endif
+
+#if NC_TRANS_CNHW
+__kernel void transpose_CNHW2NCHW(const global data_t* in, global data_t* out)
+{
+    uint i = get_global_id(0);
+
+    uint c_i  = iDiv(i, HW_OUT);
+    uint hw_i = iMod(i, c_i, HW_OUT);
+    uint h_i  = iDiv(hw_i, W_OUT);
+    uint w_i  = iMod(hw_i, h_i, W_OUT);
+
+    uint in_off              = c_i * N * HW_OUT + hw_i + IN_OFF;
+    uint out_off             = c_i * HW_IN + h_i * H_STRIDE * W_IN + w_i * W_STRIDE + OUT_OFF;
+    const global data_t* cin = (const global data_t*)(in + in_off);
+    global data_t* cout      = (global data_t*)(out + out_off);
+
+    uint n_i;
+#if IS_2D_WG
+    n_i                   = get_global_id(1);
+    cout[C * HW_IN * n_i] = cin[HW_OUT * n_i];
+#else
+    for(n_i = 0; n_i < N; n_i++)
+    {
+        cout[C * HW_IN * n_i] = cin[HW_OUT * n_i];
+    }
+#endif
+}
+#endif
+
+#if NC_TRANS_MN2NM
+__kernel void transpose_packed_MN2NM(const global data_t* in, global data_t* out)
+{
+    uint i = get_global_id(0);
+
+    if(i < M * N)
+    {
+        uint m_i = iDiv(i, N);
+        uint n_i = iMod(i, m_i, N);
+
+        uint in_off  = m_i * N + n_i + IN_OFF;
+        uint out_off = n_i * M + m_i + OUT_OFF;
+
+        const global data_t* cin = (const global data_t*)(in + in_off);
+        global data_t* cout      = (global data_t*)(out + out_off);
+
+        *cout = *cin;
+    }
+}
+#endif
+              /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ */
+
+__attribute__((always_inline)) uint iDiv(uint v, uint d)
+{
+    uint r = v / d;
+    return (r);
+}
+
+__attribute__((always_inline)) uint iMod(uint v, uint u, uint d)
+{
+    uint r = v - mul24(u, d);
+    return (r);
+}
+
+#define UNUSED __attribute__((__unused__))
+
+static inline uint get_in_off(const uint p_blck, const uint n, const uint c)
+{
+#if TRANS
+
+    const uint in_off =
+#if FORWARD
+        p_blck * RD_BLCK + c * HW + n * CHW * VEC_SIZE
+#else
+        p_blck * WR_BLCK + n * HW * VEC_SIZE + c * NHW_OUT
+#endif
+        ;
+
+#else
+
+    const uint in_off =
+#if FORWARD
+        p_blck * RD_BLCK + c * HW * VEC_SIZE + n * CHW
+#else
+        p_blck * WR_BLCK + c * HW * VEC_SIZE + n * CHW_OUT
+#endif
+        ;
+
+#endif // end of #if TRANS
+
+    return in_off;
+}
+
+static inline uint get_out_off(const uint p_blck, const uint n, const uint c)
+{
+#if TRANS
+
+    const uint out_off =
+#if FORWARD
+        p_blck * WR_BLCK + n * HW * VEC_SIZE + c * NHW_OUT
+#else
+        p_blck * RD_BLCK + c * HW + n * CHW * VEC_SIZE
+#endif
+        ;
+
+#else
+
+    const uint out_off =
+#if FORWARD
+        p_blck * WR_BLCK + c * HW * VEC_SIZE + n * CHW_OUT
+#else
+        p_blck * RD_BLCK + c * HW * VEC_SIZE + n * CHW
+#endif
+        ;
+
+#endif // end of #if TRANS
+
+    return out_off;
+}
+
+static inline void load_data(const uint in_off,
+#if !(FORWARD && TRANS)
+                             UNUSED
+#endif
+                             const uint n,
+#if !(FORWARD && !TRANS)
+                             UNUSED
+#endif
+                             const uint c,
+                             const global DATA_TYPE* in,
+                             __private DATA_TYPE* in_buf)
+{
+#if FORWARD
+#pragma unroll
+    for(int v = 0; v < VEC_SIZE; v++)
+    {
+#if TRANS
+        *((READ_TYPE*)(in_buf + RD_BLCK * v)) =
+            ((n * VEC_SIZE + v) < N) ? *((const global READ_TYPE*)(in + in_off + CHW * v)) : 0;
+#else
+        *((READ_TYPE*)(in_buf + RD_BLCK * v)) =
+            ((c * VEC_SIZE + v) < C) ? *((const global READ_TYPE*)(in + in_off + HW * v)) : 0;
+#endif
+    }
+#else
+
+    *((WRITE_TYPE*)in_buf)           = *((const global WRITE_TYPE*)(in + in_off));
+
+#endif
+}
+
+static inline void local_trans(__private DATA_TYPE* in_buf, __private DATA_TYPE* out_buf)
+{
+    for(int i = 0; i < RD_BLCK; i++)
+    {
+#pragma unroll
+        for(int v = 0; v < VEC_SIZE; v++)
+        {
+#if FORWARD
+            out_buf[i * VEC_SIZE + v] = in_buf[v * RD_BLCK + i];
+#else
+            out_buf[v * RD_BLCK + i] = in_buf[i * VEC_SIZE + v];
+#endif
+        }
+    }
+}
+
+static inline void write_data(const uint out_off,
+#if !(!FORWARD && TRANS)
+                              UNUSED
+#endif
+                              const uint n,
+#if !(!FORWARD && !TRANS)
+                              UNUSED
+#endif
+                              const uint c,
+                              global DATA_TYPE* out,
+                              const __private DATA_TYPE* out_buf)
+{
+
+#if FORWARD
+
+    *((global WRITE_TYPE*)(out + out_off)) = *((WRITE_TYPE*)out_buf);
+
+#else
+
+#pragma unroll
+    for(int v = 0; v < VEC_SIZE; v++)
+    {
+#if TRANS
+        if((n * VEC_SIZE + v) < N)
+            *((global READ_TYPE*)(out + out_off + CHW * v)) =
+                *((READ_TYPE*)(out_buf + RD_BLCK * v));
+#else
+        if((c * VEC_SIZE + v) < C)
+            *((global READ_TYPE*)(out + out_off + HW * v)) = *((READ_TYPE*)(out_buf + RD_BLCK * v));
+#endif
+    }
+
+#endif
+}
+
+static inline void global_trans(const uint in_off,
+                                const uint out_off,
+                                const uint p_blck,
+#if !TRANS
+                                UNUSED
+#endif
+                                const uint n,
+#if TRANS
+                                UNUSED
+#endif
+                                const uint c,
+                                const global DATA_TYPE* in,
+                                global DATA_TYPE* out)
+{
+    int HW_tail = iMod(HW, p_blck, RD_BLCK);
+
+    for(int i = 0; i < HW_tail; i++)
+    {
+#pragma unroll
+        for(int v = 0; v < VEC_SIZE; v++)
+        {
+#if FORWARD
+
+#if TRANS
+            out[out_off + i * VEC_SIZE + v] =
+                ((n * VEC_SIZE + v) < N) ? in[in_off + CHW * v + i] : 0;
+#else
+            out[out_off + i * VEC_SIZE + v] =
+                ((c * VEC_SIZE + v) < C) ? in[in_off + HW * v + i] : 0;
+#endif
+
+#else
+
+#if TRANS
+            if((n * VEC_SIZE + v) < N)
+                out[out_off + CHW * v + i] = in[in_off + i * VEC_SIZE + v];
+#else
+            if((c * VEC_SIZE + v) < C)
+                out[out_off + HW * v + i] = in[in_off + i * VEC_SIZE + v];
+#endif
+
+#endif
+        }
+    }
+}
+
+__kernel void transpose_NCHW2Vec(const global DATA_TYPE* in, global DATA_TYPE* out)
+{
+    // to reduce granularity loss
+    const uint c_p_blck = get_global_id(0);
+    const uint c        = iDiv(c_p_blck, HW_RD);
+    const uint p_blck   = iMod(c_p_blck, c, HW_RD);
+
+    __private DATA_TYPE in_buf[RD_BLCK * VEC_SIZE];
+    __private DATA_TYPE out_buf[RD_BLCK * VEC_SIZE];
+
+#if IS_2D_WG
+    const uint n = get_global_id(1);
+#else
+    for(uint n = 0; n < GD_1; n++)
+#endif
+    {
+        uint in_off = get_in_off(p_blck, n, c);
+
+        uint out_off = get_out_off(p_blck, n, c);
+
+#if IS_HW_ODD
+        if(p_blck < HW_RD - 1)
+#endif
+        {
+            load_data(in_off, n, c, in, in_buf);
+
+            local_trans(in_buf, out_buf);
+
+            write_data(out_off, n, c, out, out_buf);
+        }
+#if IS_HW_ODD
+        else
+        {
+            global_trans(in_off, out_off, p_blck, n, c, in, out);
+        }
+#endif
+    }
+}
+      /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+
+#ifndef MIOPEN_USE_FP32
+#define MIOPEN_USE_FP32 0
+#endif
+
+#ifndef MIOPEN_USE_FP16
+#define MIOPEN_USE_FP16 0
+#endif
+
+#ifndef MIOPEN_USE_BFP16
+#define MIOPEN_USE_BFP16 0
+#endif
+
+#ifndef MIOPEN_USE_INT8
+#define MIOPEN_USE_INT8 0
+#endif
+
+#ifndef MIOPEN_USE_INT8x4
+#define MIOPEN_USE_INT8x4 0
+#endif
+
+#ifndef MIOPEN_USE_INT32
+#define MIOPEN_USE_INT32 0
+#endif
+
+#if MIOPEN_USE_INT8
+typedef char data_t;
+#elif MIOPEN_USE_INT8x4
+typedef uint data_t;
+#elif MIOPEN_USE_INT32
+typedef int data_t;
+#elif(MIOPEN_USE_FP16 || MIOPEN_USE_BFP16)
+// As the half type degrades the performance, use short instead of half in the
+// im2col, which has no match op. May change back to half when compile can
+// deliver equal performance as short
+typedef short data_t;
+#elif MIOPEN_USE_FP32
+typedef float data_t;
+#endif
+
+/* Simple GPU implementation - number of threads launced == sizeof im2col buffer
+ * Each thread writes one pixel of output. First (out_h*out_w) threads write to
+ * the first line (row) of the im2col output.
+ *
+ * kernel void Im2Col(global data_t* im, int im_offset,
+ * 		const int h, const int w,
+ * 		const int wei_h, const int wei_w,
+ * 		const int out_h, const int out_w,
+ * 		const int pad_h, const int pad_w,
+ * 		const int stride_h, const int stride_w,
+ * 		global data_t* col)
+ * {
+ * 	int tid = get_global_id(0);
+ *  // which row of the output to write to
+ * 	int col_row = tid / (out_h * out_w);
+ *
+ *  // which pixel from the image and which channel to read from
+ * 	int im_x = col_row % wei_w; // used to compute im_off_w
+ * 	int im_y = (col_row / wei_w) % wei_h; // used to compute im_off_y
+ * 	int im_c = col_row / (wei_w * wei_h); // im_c is the img channel
+ *
+ * 	int out_x = tid % out_w;
+ * 	int out_y = (tid / out_w) % out_h;
+ *
+ *  // take the strides and padding into account while reading from the image
+ * 	int im_off_h = out_y * stride_h - pad_h + im_y;
+ * 	int im_off_w = out_x * stride_w - pad_w + im_x;
+ *
+ * 	global data_t *im_off = (global data_t *)&im[im_offset];
+ *
+ * 	if(im_off_h >= 0 && im_off_h < h && im_off_w >= 0 && im_off_w < w) {
+ * 		col[col_row*out_h*out_w + out_y*out_w + out_x] = im_off[im_c*h*w + im_off_h*w +
+ * im_off_w];
+ * 	}
+ * 	else {
+ * 		col[col_row*out_h*out_w + out_y*out_w + out_x] = 0.;
+ * 	}
+ * }
+ */
+
+kernel void Im2d2Col(const int data_size_off,
+                     global data_t* im,
+                     const int im_offset,
+                     const int h,
+                     const int w,
+                     const int wei_h,
+                     const int wei_w,
+                     const int out_h,
+                     const int out_w,
+                     const int pad_h,
+                     const int pad_w,
+                     const int stride_h,
+                     const int stride_w,
+                     const int dilation_h,
+                     const int dilation_w,
+                     global data_t* col)
+{
+#define THREADS_PER_CH (256 / NUM_CH_PER_WG)
+
+#if USE_IM_OFF_GUARD
+#define IM_OFF_GUARD(idx) (idx) < data_size_off ? im_off[(idx)] : 0
+#else
+#define IM_OFF_GUARD(idx) im_off[idx]
+#endif
+
+    global data_t* im_off = im + im_offset;
+    int lid               = get_local_id(0);
+    int gid               = get_group_id(0);
+
+#ifndef EXTREME_LARGE
+#if NUM_IM_BLKS == 1 && STRIDE_GT_1 == 0
+
+    // Load image into LDS
+    local data_t local_im[LOCAL_MEM_SIZE];
+
+    int witem_ch = lid / THREADS_PER_CH;
+
+    int im_lid = lid;
+    while(im_lid < NUM_CH_PER_WG * h * w)
+    {
+        local_im[im_lid] = IM_OFF_GUARD((gid * NUM_CH_PER_WG) * h * w + im_lid);
+        im_lid += 256;
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    // where will each thread to col
+    int witem_ch_offset = witem_ch * h * w;
+
+    if(lid % THREADS_PER_CH < out_h * out_w)
+    {
+        int inner_lid = lid % THREADS_PER_CH;
+        int out_x     = inner_lid % out_w;
+        int out_y     = inner_lid / out_w;
+
+        int col_x = out_y * out_w + out_x;
+        int col_y = (gid * NUM_CH_PER_WG + witem_ch) * out_h * out_w * wei_h * wei_w;
+
+        for(int y = 0; y < wei_h; y++)
+        {
+            for(int x = 0; x < wei_w; x++)
+            {
+                int im_off_h = out_y * stride_h - pad_h + y * dilation_h;
+                int im_off_w = out_x * stride_w - pad_w + x * dilation_w;
+                if(im_off_h >= 0 && im_off_h < h && im_off_w >= 0 && im_off_w < w)
+                    col[col_y + col_x + (y * wei_w + x) * out_h * out_w] =
+                        local_im[witem_ch_offset + (im_off_h)*w + im_off_w];
+                else
+                    col[col_y + col_x + (y * wei_w + x) * out_h * out_w] = 0;
+            }
+        }
+    }
+
+#else  // NUM_IM_BLKS > 1 || STRIDE_GT_1 1
+
+    local data_t local_im[LOCAL_MEM_SIZE];
+
+    int wg_ch = gid / NUM_IM_BLKS;
+
+    int im_x = ((gid % NUM_IM_BLKS) % NUM_IM_BLKS_X) * TILE_SZ_X;
+    int im_y = ((gid % NUM_IM_BLKS) / NUM_IM_BLKS_X) * TILE_SZ_Y;
+
+    int out_cols_wg = im_x + TILE_SZ_X <= out_w ? TILE_SZ_X : out_w - im_x;
+    int out_rows_wg = im_y + TILE_SZ_Y <= out_h ? TILE_SZ_Y : out_h - im_y;
+
+    int im_cols_wg = (TILE_SZ_X - 1) * stride_w + (wei_w - 1) * dilation_w + 1;
+    int inner_lid  = lid;
+
+    while(inner_lid < LOCAL_MEM_SIZE)
+    {
+        int row_to_use = inner_lid / im_cols_wg;
+        int col_to_use = inner_lid % im_cols_wg;
+        int lm_offset  = row_to_use * im_cols_wg + col_to_use;
+        if(im_y * stride_h + row_to_use >= pad_h && im_y * stride_h + row_to_use < h + pad_h &&
+           im_x * stride_w + col_to_use >= pad_w && im_x * stride_w + col_to_use < w + pad_w)
+        {
+            int im_off_h        = im_y * stride_h + row_to_use - pad_h;
+            int im_off_w        = im_x * stride_w + col_to_use - pad_w;
+            local_im[lm_offset] = IM_OFF_GUARD(wg_ch * h * w + im_off_h * w + im_off_w);
+        }
+        else
+            local_im[lm_offset] = 0;
+
+        inner_lid += 256;
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    inner_lid = lid;
+    while(inner_lid < out_cols_wg * out_rows_wg)
+    {
+        int out_x = inner_lid % out_cols_wg;
+        int out_y = inner_lid / out_cols_wg;
+
+        int col_x = (im_y + out_y) * out_w + im_x + out_x;
+        int col_y = (gid / NUM_IM_BLKS) * out_h * out_w * wei_h * wei_w;
+
+        for(int y = 0; y < wei_h; y++)
+        {
+            for(int x = 0; x < wei_w; x++)
+            {
+                int im_off_h = out_y * stride_h + y * dilation_h;
+                int im_off_w = out_x * stride_w + x * dilation_w;
+                col[col_y + col_x + (y * wei_w + x) * out_h * out_w] =
+                    local_im[(im_off_h)*im_cols_wg + im_off_w];
+            }
+        }
+        inner_lid += 256;
+    }
+#endif // NUM_IM_BLKS && STRIDE_GT_1
+#else
+
+    int tid = get_global_id(0);
+    while(tid < out_h * out_w * wei_w * wei_h * NUM_CH_TOTAL)
+    {
+        // which row of the output to write to
+        int col_row = tid / (out_h * out_w);
+
+        // which pixel from the image and which channel to read from
+        int im_x = col_row % wei_w;           // used to compute im_off_w
+        int im_y = (col_row / wei_w) % wei_h; // used to compute im_off_y
+        int im_c = col_row / (wei_w * wei_h); // im_c is the img channel
+
+        int out_x = tid % out_w;
+        int out_y = (tid / out_w) % out_h;
+
+        // take the strides and padding into account while reading from the image
+        int im_off_h = out_y * stride_h - pad_h + im_y * dilation_h;
+        int im_off_w = out_x * stride_w - pad_w + im_x * dilation_w;
+
+        if(im_off_h >= 0 && im_off_h < h && im_off_w >= 0 && im_off_w < w)
+        {
+            col[col_row * out_h * out_w + out_y * out_w + out_x] =
+                im_off[im_c * h * w + im_off_h * w + im_off_w];
+        }
+        else
+        {
+            col[col_row * out_h * out_w + out_y * out_w + out_x] = 0.;
+        }
+        tid += get_global_size(0);
+    }
+#endif
+}
+    /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+
+#ifndef MIOPEN_USE_FP32
+#define MIOPEN_USE_FP32 0
+#endif
+
+#ifndef MIOPEN_USE_FP16
+#define MIOPEN_USE_FP16 0
+#endif
+
+#ifndef MIOPEN_USE_BFP16
+#define MIOPEN_USE_BFP16 0
+#endif
+
+#ifndef MIOPEN_USE_INT8
+#define MIOPEN_USE_INT8 0
+#endif
+
+#ifndef MIOPEN_USE_INT8x4
+#define MIOPEN_USE_INT8x4 0
+#endif
+
+#ifndef MIOPEN_USE_INT32
+#define MIOPEN_USE_INT32 0
+#endif
+
+#if MIOPEN_USE_INT8
+typedef char data_t;
+#elif MIOPEN_USE_INT8x4
+typedef uint data_t;
+#elif MIOPEN_USE_INT32
+typedef int data_t;
+#elif(MIOPEN_USE_FP16 || MIOPEN_USE_BFP16)
+// As the half type degrades the performance, use short instead of half in the
+// im2col, which has no match op. May change back to half when compile can
+// deliver equal performance as short
+typedef short data_t;
+#elif MIOPEN_USE_FP32
+typedef float data_t;
+#endif
+
+kernel void Im3d2Col(global data_t* const __restrict im,
+                     const unsigned im_offset,
+                     const unsigned im_c_size,
+                     const unsigned im_d_size,
+                     const unsigned im_h_size,
+                     const unsigned im_w_size,
+                     const unsigned wei_d_size,
+                     const unsigned wei_h_size,
+                     const unsigned wei_w_size,
+                     const unsigned out_d_size,
+                     const unsigned out_h_size,
+                     const unsigned out_w_size,
+                     const unsigned pad_d_size,
+                     const unsigned pad_h_size,
+                     const unsigned pad_w_size,
+                     const unsigned stride_d_size,
+                     const unsigned stride_h_size,
+                     const unsigned stride_w_size,
+                     const unsigned dilation_d_size,
+                     const unsigned dilation_h_size,
+                     const unsigned dilation_w_size,
+                     global data_t* __restrict col)
+{
+    unsigned col_size =
+        out_d_size * out_h_size * out_w_size * wei_d_size * wei_h_size * wei_w_size * im_c_size;
+
+    for(unsigned tid = get_global_id(0); tid < col_size; tid += get_global_size(0))
+    {
+        // "col" matrix row and colume id
+        unsigned col_i = tid / (out_d_size * out_h_size * out_w_size);
+        unsigned col_j = tid - col_i * (out_d_size * out_h_size * out_w_size);
+
+        // output tensor out_d, out_h, out_w id
+        unsigned out_d = col_j / (out_h_size * out_w_size);
+        unsigned tmp   = col_j - out_d * (out_h_size * out_w_size);
+        unsigned out_h = tmp / out_w_size;
+        unsigned out_w = tmp - out_h * out_w_size;
+
+        // weight tensor wei_c, wei_d, wei_h, wei_d id
+        unsigned wei_c = col_i / (wei_d_size * wei_h_size * wei_w_size);
+        tmp            = col_i - wei_c * (wei_d_size * wei_h_size * wei_w_size);
+        unsigned wei_d = tmp / (wei_h_size * wei_w_size);
+        tmp -= wei_d * (wei_h_size * wei_w_size);
+        unsigned wei_h = tmp / wei_w_size;
+        unsigned wei_w = tmp - wei_h * wei_w_size;
+
+        // input tensor im_d, im_h, im_w id
+        int im_d = (int)(stride_d_size * out_d + dilation_d_size * wei_d) - (int)(pad_d_size);
+        int im_h = (int)(stride_h_size * out_h + dilation_h_size * wei_h) - (int)(pad_h_size);
+        int im_w = (int)(stride_w_size * out_w + dilation_w_size * wei_w) - (int)(pad_w_size);
+
+        data_t value = (im_d >= 0 && im_d < im_d_size && im_h >= 0 && im_h < im_h_size &&
+                        im_w >= 0 && im_w < im_w_size)
+                           ? im[im_offset + wei_c * (im_d_size * im_h_size * im_w_size) +
+                                im_d * (im_h_size * im_w_size) + im_h * im_w_size + im_w]
+                           : 0;
+
+        col[tid] = value;
+    }
+}
+                /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+typedef union
+{
+    uint u32;
+    ushort2 ushortx2;
+    float f32;
+} cvt_bf16_fp32_t;
+
+float bfloat16_to_float(ushort src_val)
+{
+    cvt_bf16_fp32_t target_val;
+    target_val.ushortx2 = (ushort2)(0, src_val);
+    return target_val.f32;
+}
+
+ushort float_to_bfloat16(float src_val)
+{
+    cvt_bf16_fp32_t target_val;
+    target_val.f32 = src_val;
+    // BF16 round and NaN preservation code matches
+    // https://github.com/ROCmSoftwarePlatform/rocBLAS/blob/develop/library/include/rocblas_bfloat16.h
+    if((~target_val.u32 & 0x7f800000) == 0) // Inf or NaN
+    {
+        // When all of the exponent bits are 1, the value is Inf or NaN.
+        // Inf is indicated by a zero mantissa. NaN is indicated by any nonzero
+        // mantissa bit. Quiet NaN is indicated by the most significant mantissa
+        // bit being 1. Signaling NaN is indicated by the most significant
+        // mantissa bit being 0 but some other bit(s) being 1. If any of the
+        // lower 16 bits of the mantissa are 1, we set the least significant bit
+        // of the bfloat16 mantissa, in order to preserve signaling NaN in case
+        // the bloat16's mantissa bits are all 0.
+        if((target_val.u32 & 0xffff) != 0)
+        {
+            target_val.u32 |= 0x10000; // Preserve signaling NaN
+        }
+    }
+    else
+    {
+#ifdef MIOPEN_USE_RNE_BFLOAT16
+        // When the exponent bits are not all 1s, then the value is zero, normal,
+        // or subnormal. We round the bfloat16 mantissa up by adding 0x7FFF, plus
+        // 1 if the least significant bit of the bfloat16 mantissa is 1 (odd).
+        // This causes the bfloat16's mantissa to be incremented by 1 if the 16
+        // least significant bits of the float mantissa are greater than 0x8000,
+        // or if they are equal to 0x8000 and the least significant bit of the
+        // bfloat16 mantissa is 1 (odd). This causes it to be rounded to even when
+        // the lower 16 bits are exactly 0x8000. If the bfloat16 mantissa already
+        // has the value 0x7f, then incrementing it causes it to become 0x00 and
+        // the exponent is incremented by one, which is the next higher FP value
+        // to the unrounded bfloat16 value. When the bfloat16 value is subnormal
+        // with an exponent of 0x00 and a mantissa of 0x7F, it may be rounded up
+        // to a normal value with an exponent of 0x01 and a mantissa of 0x00.
+        // When the bfloat16 value has an exponent of 0xFE and a mantissa of 0x7F,
+        // incrementing it causes it to become an exponent of 0xFF and a mantissa
+        // of 0x00, which is Inf, the next higher value to the unrounded value.
+        target_val.u32 +=
+            (0x7fff + (target_val.ushortx2.hi & 1)); // Round to nearest, round to even
+#else                                                // Truncation rounding
+// do nothing
+#endif
+    }
+    return target_val.ushortx2.hi;
+}
+
+
+#define PPCAT_NX(A, B) A##B
+#define PPCAT(A, B) PPCAT_NX(A, B)
+#define TWO 2
+#define FOUR 4
+#define EIGHT 8
+
+#if MIOPEN_USE_FP16 == 1
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#define _FLOAT half
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 2 /* sizeof is unavailable for preprocessor */
+#ifndef HALF_MAX
+#define MAX_VAL 65504 /* max value */
+#else
+#define MAX_VAL HALF_MAX
+#endif
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define _FLOAT float
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 4 /* sizeof is unavailable for preprocessor */
+#ifndef FLT_MAX
+#define MAX_VAL 3.402823466e+38F /* max value */
+#else
+#define MAX_VAL FLT_MAX
+#endif
+#endif
+#if MIOPEN_USE_BFP16 == 1
+#define _FLOAT ushort
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 2 /* sizeof is unavailable for preprocessor */
+#define MAX_VAL 0x7F7F /* max value */
+#endif
+
+#define _FLOAT2 PPCAT(_FLOAT, TWO)
+#define _FLOAT4 PPCAT(_FLOAT, FOUR)
+#define _FLOAT8 PPCAT(_FLOAT, EIGHT)
+
+#if MIOPEN_USE_FP16 == 1
+#define CVT_FLOAT2ACCUM(x) ((_FLOAT_ACCUM)(x))
+#define CVT_ACCUM2FLOAT(x) ((_FLOAT)(x))
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define CVT_FLOAT2ACCUM(x) ((_FLOAT_ACCUM)(x))
+#define CVT_ACCUM2FLOAT(x) ((_FLOAT)(x))
+#endif
+#if MIOPEN_USE_BFP16 == 1
+#define CVT_FLOAT2ACCUM(x) bfloat16_to_float(x)
+#define CVT_ACCUM2FLOAT(x) float_to_bfloat16(x)
+#endif
+
+
+#if MIOPEN_USE_FP16
+#define ACCUMULATOR_NEEDS_CONVERSION 1
+#elif MIOPEN_USE_BFP16
+#define ACCUMULATOR_NEEDS_CONVERSION 1
+#elif MIOPEN_USE_FP32
+#define ACCUMULATOR_NEEDS_CONVERSION 0
+#endif
+
+__kernel void Col2Im2d(global _FLOAT* col,
+                       const int col_h,
+                       const int col_w,
+                       const int wei_h,
+                       const int wei_w,
+                       const int pad_h,
+                       const int pad_w,
+                       const int stride_h,
+                       const int stride_w,
+                       const int dilation_h,
+                       const int dilation_w,
+                       const int height,
+                       const int width,
+                       global _FLOAT* im,
+                       const int im_offset)
+{
+    global _FLOAT* im_off = im + im_offset;
+    int gid               = (int)get_global_id(0);
+
+    int im_ch  = gid / (width * height);
+    int im_pix = gid % (width * height);
+    int im_h   = (im_pix / width) + pad_h;
+    int im_w   = (im_pix % width) + pad_w;
+
+    int start_h = (im_h < dilation_h * (wei_h - 1) + 1)
+                      ? 0
+                      : (im_h - (dilation_h * (wei_h - 1) + 1)) / stride_h + 1;
+    int end_h   = min(col_h, im_h / stride_h + 1);
+    int start_w = (im_w < dilation_w * (wei_w - 1) + 1)
+                      ? 0
+                      : (im_w - (dilation_w * (wei_w - 1) + 1)) / stride_w + 1;
+    int end_w = min(col_w, im_w / stride_w + 1);
+
+    int ch_offset = im_ch * col_w * col_h * wei_w * wei_h;
+    col += ch_offset;
+
+    _FLOAT_ACCUM tmp = (_FLOAT_ACCUM)0;
+    for(int cy = start_h; cy < end_h; cy++)
+    {
+        for(int cx = start_w; cx < end_w; cx++)
+        {
+            if((im_h - cy * stride_h) % dilation_h == 0 && (im_w - cx * stride_w) % dilation_w == 0)
+            {
+                int col_off_y = cy + (((im_h - cy * stride_h) / dilation_h) * wei_w * col_h);
+                int col_off_x = cx + (((im_w - cx * stride_w) / dilation_w) * col_w * col_h);
+
+                tmp += CVT_FLOAT2ACCUM(col[col_off_y * col_w + col_off_x]);
+            }
+        }
+    }
+#if ACCUMULATOR_NEEDS_CONVERSION
+    im_off[gid] = tmp > CVT_FLOAT2ACCUM(MAX_VAL) ? MAX_VAL : CVT_ACCUM2FLOAT(tmp);
+#else
+    im_off[gid] = CVT_ACCUM2FLOAT(tmp);
+#endif
+}
+                /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+typedef union
+{
+    uint u32;
+    ushort2 ushortx2;
+    float f32;
+} cvt_bf16_fp32_t;
+
+float bfloat16_to_float(ushort src_val)
+{
+    cvt_bf16_fp32_t target_val;
+    target_val.ushortx2 = (ushort2)(0, src_val);
+    return target_val.f32;
+}
+
+ushort float_to_bfloat16(float src_val)
+{
+    cvt_bf16_fp32_t target_val;
+    target_val.f32 = src_val;
+    // BF16 round and NaN preservation code matches
+    // https://github.com/ROCmSoftwarePlatform/rocBLAS/blob/develop/library/include/rocblas_bfloat16.h
+    if((~target_val.u32 & 0x7f800000) == 0) // Inf or NaN
+    {
+        // When all of the exponent bits are 1, the value is Inf or NaN.
+        // Inf is indicated by a zero mantissa. NaN is indicated by any nonzero
+        // mantissa bit. Quiet NaN is indicated by the most significant mantissa
+        // bit being 1. Signaling NaN is indicated by the most significant
+        // mantissa bit being 0 but some other bit(s) being 1. If any of the
+        // lower 16 bits of the mantissa are 1, we set the least significant bit
+        // of the bfloat16 mantissa, in order to preserve signaling NaN in case
+        // the bloat16's mantissa bits are all 0.
+        if((target_val.u32 & 0xffff) != 0)
+        {
+            target_val.u32 |= 0x10000; // Preserve signaling NaN
+        }
+    }
+    else
+    {
+#ifdef MIOPEN_USE_RNE_BFLOAT16
+        // When the exponent bits are not all 1s, then the value is zero, normal,
+        // or subnormal. We round the bfloat16 mantissa up by adding 0x7FFF, plus
+        // 1 if the least significant bit of the bfloat16 mantissa is 1 (odd).
+        // This causes the bfloat16's mantissa to be incremented by 1 if the 16
+        // least significant bits of the float mantissa are greater than 0x8000,
+        // or if they are equal to 0x8000 and the least significant bit of the
+        // bfloat16 mantissa is 1 (odd). This causes it to be rounded to even when
+        // the lower 16 bits are exactly 0x8000. If the bfloat16 mantissa already
+        // has the value 0x7f, then incrementing it causes it to become 0x00 and
+        // the exponent is incremented by one, which is the next higher FP value
+        // to the unrounded bfloat16 value. When the bfloat16 value is subnormal
+        // with an exponent of 0x00 and a mantissa of 0x7F, it may be rounded up
+        // to a normal value with an exponent of 0x01 and a mantissa of 0x00.
+        // When the bfloat16 value has an exponent of 0xFE and a mantissa of 0x7F,
+        // incrementing it causes it to become an exponent of 0xFF and a mantissa
+        // of 0x00, which is Inf, the next higher value to the unrounded value.
+        target_val.u32 +=
+            (0x7fff + (target_val.ushortx2.hi & 1)); // Round to nearest, round to even
+#else                                                // Truncation rounding
+// do nothing
+#endif
+    }
+    return target_val.ushortx2.hi;
+}
+
+
+#define PPCAT_NX(A, B) A##B
+#define PPCAT(A, B) PPCAT_NX(A, B)
+#define TWO 2
+#define FOUR 4
+#define EIGHT 8
+
+#if MIOPEN_USE_FP16 == 1
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#define _FLOAT half
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 2 /* sizeof is unavailable for preprocessor */
+#ifndef HALF_MAX
+#define MAX_VAL 65504 /* max value */
+#else
+#define MAX_VAL HALF_MAX
+#endif
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define _FLOAT float
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 4 /* sizeof is unavailable for preprocessor */
+#ifndef FLT_MAX
+#define MAX_VAL 3.402823466e+38F /* max value */
+#else
+#define MAX_VAL FLT_MAX
+#endif
+#endif
+#if MIOPEN_USE_BFP16 == 1
+#define _FLOAT ushort
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 2 /* sizeof is unavailable for preprocessor */
+#define MAX_VAL 0x7F7F /* max value */
+#endif
+
+#define _FLOAT2 PPCAT(_FLOAT, TWO)
+#define _FLOAT4 PPCAT(_FLOAT, FOUR)
+#define _FLOAT8 PPCAT(_FLOAT, EIGHT)
+
+#if MIOPEN_USE_FP16 == 1
+#define CVT_FLOAT2ACCUM(x) ((_FLOAT_ACCUM)(x))
+#define CVT_ACCUM2FLOAT(x) ((_FLOAT)(x))
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define CVT_FLOAT2ACCUM(x) ((_FLOAT_ACCUM)(x))
+#define CVT_ACCUM2FLOAT(x) ((_FLOAT)(x))
+#endif
+#if MIOPEN_USE_BFP16 == 1
+#define CVT_FLOAT2ACCUM(x) bfloat16_to_float(x)
+#define CVT_ACCUM2FLOAT(x) float_to_bfloat16(x)
+#endif
+
+
+#if MIOPEN_USE_FP16
+#define ACCUMULATOR_NEEDS_CONVERSION 1
+#elif MIOPEN_USE_BFP16
+#define ACCUMULATOR_NEEDS_CONVERSION 1
+#elif MIOPEN_USE_FP32
+#define ACCUMULATOR_NEEDS_CONVERSION 0
+#endif
+
+__kernel void Col2Im3d(global _FLOAT* col,
+                       const int col_d,
+                       const int col_h,
+                       const int col_w,
+                       const int wei_d,
+                       const int wei_h,
+                       const int wei_w,
+                       const int pad_d,
+                       const int pad_h,
+                       const int pad_w,
+                       const int stride_d,
+                       const int stride_h,
+                       const int stride_w,
+                       const int dilation_d,
+                       const int dilation_h,
+                       const int dilation_w,
+                       const int depth,
+                       const int height,
+                       const int width,
+                       global _FLOAT* im,
+                       const int im_offset)
+{
+    global _FLOAT* im_off = im + im_offset;
+    int gid               = (int)get_global_id(0);
+
+    int im_ch = gid / (width * height * depth);
+    int itmp  = gid % (width * height * depth);
+    int im_d  = itmp / (width * height);
+    itmp      = itmp % (width * height);
+    int im_h  = itmp / width;
+    int im_w  = itmp % width;
+
+    im_d += pad_d;
+    im_h += pad_h;
+    im_w += pad_w;
+
+    int start_d = (im_d < dilation_d * (wei_d - 1) + 1)
+                      ? 0
+                      : (im_d - (dilation_d * (wei_d - 1) + 1)) / stride_d + 1;
+    int end_d = min(col_d, im_d / stride_d + 1);
+
+    int start_h = (im_h < dilation_h * (wei_h - 1) + 1)
+                      ? 0
+                      : (im_h - (dilation_h * (wei_h - 1) + 1)) / stride_h + 1;
+    int end_h = min(col_h, im_h / stride_h + 1);
+
+    int start_w = (im_w < dilation_w * (wei_w - 1) + 1)
+                      ? 0
+                      : (im_w - (dilation_w * (wei_w - 1) + 1)) / stride_w + 1;
+    int end_w = min(col_w, im_w / stride_w + 1);
+
+    int ch_offset = im_ch * col_d * col_w * col_h * wei_d * wei_w * wei_h;
+    col += ch_offset;
+
+    _FLOAT_ACCUM tmp = (_FLOAT_ACCUM)0;
+
+    for(int cz = start_d; cz < end_d; cz++)
+    {
+        for(int cy = start_h; cy < end_h; cy++)
+        {
+            for(int cx = start_w; cx < end_w; cx++)
+            {
+                if((im_d - cz * stride_d) % dilation_d == 0 &&
+                   (im_h - cy * stride_h) % dilation_h == 0 &&
+                   (im_w - cx * stride_w) % dilation_w == 0)
+                {
+                    int z = (im_d - cz * stride_d) / dilation_d;
+                    int y = (im_h - cy * stride_h) / dilation_h;
+                    int x = (im_w - cx * stride_w) / dilation_w;
+
+                    int col_off =
+                        (((((z * wei_h) + y) * wei_w + x) * col_d + cz) * col_h + cy) * col_w + cx;
+
+                    tmp += CVT_FLOAT2ACCUM(col[col_off]);
+                }
+            }
+        }
+    }
+#if ACCUMULATOR_NEEDS_CONVERSION
+    im_off[gid] = tmp > CVT_FLOAT2ACCUM(MAX_VAL) ? MAX_VAL : CVT_ACCUM2FLOAT(tmp);
+#else
+    im_off[gid] = CVT_ACCUM2FLOAT(tmp);
+#endif
+}
+          /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial porti

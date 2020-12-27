@@ -1,0 +1,3250 @@
+st_1_41=0x063e7064
+div_const_1_42=0x06186187
+div_const_1_43=0x05f417d1
+div_const_1_44=0x05d1745e
+div_const_1_45=0x05b05b06
+div_const_1_46=0x0590b217
+div_const_1_47=0x0572620b
+div_const_1_48=0x05555556
+div_const_1_49=0x0539782a
+div_const_1_50=0x051eb852
+div_const_1_51=0x05050506
+div_const_1_52=0x04ec4ec5
+div_const_1_53=0x04d4873f
+div_const_1_54=0x04bda130
+div_const_1_55=0x04a7904b
+div_const_1_56=0x04924925
+div_const_1_57=0x047dc120
+div_const_1_58=0x0469ee59
+div_const_1_59=0x0456c798
+div_const_1_60=0x04444445
+div_const_1_61=0x04325c54
+div_const_1_62=0x04210843
+div_const_1_63=0x04104105
+div_const_1_64=0x04000000
+
+.macro _s_div_const_u32_u16 dst, src, denum
+	.if \denum == 1
+		s_mov_b32 \dst, \src
+	.elseif \denum >=2 && \denum <= 64
+		s_mul_hi_u32 \dst, div_const_1_\denum, \src
+	.else
+		static_assert(0)
+	.endif
+.endm
+
+.macro _v_div_const_u32_u16 dst, src, denum, tmp
+	.if \denum == 1
+		v_mov_b32 \dst, \src
+	.elseif \denum >=2 && \denum <= 64
+		s_mov_b32 \tmp, div_const_1_\denum
+		v_mul_hi_u32 \dst, \tmp, \src
+	.else
+		static_assert(0)
+	.endif
+.endm
+
+.macro _s_ceil_u32 dst, src, denum
+	s_add_u32 \dst, \denum - 1, \src
+	_s_div_const_u32_u16 \dst, \dst, \denum
+.endm
+
+
+
+// kernarg layout:
+// dwords 0 	uint32_t N;
+// dwords 1 	uint32_t C;
+// dwords 2 	uint32_t H;
+// dwords 3 	uint32_t W;
+//
+// dwords 4 	uint32_t K;
+// dwords 5 	uint32_t n_groups;
+// dwords 6 	uint32_t flags;
+// dwords 7 	uint32_t reserved;
+//
+// dwords 8:9	uint64_t  data_addr;
+// dwords 10:11	uint64_t  filter_addr;
+// dwords 12:13 uint64_t  output_addr;
+// dwords 14:15	uint64_t  return_addr;
+//
+// dwords 16	uint32_t  R;	// filter height
+// dwords 17	uint32_t  S;	// filter width
+// dwords 18	int32_t   pad_h;	// padding
+// dwords 19	int32_t   pad_w;	// padding
+//
+// dwords 20	uint32_t  out_h;	// output height
+// dwords 21	uint32_t  out_w;	// output width
+//
+// dwords 22:23	uint64_t bias_addr;
+// dwords 24	float RELU_alpha;
+//
+// dwords 25	uint32_t d_N_stride;
+// dwords 26	uint32_t d_C_stride;
+// dwords 27	uint32_t d_H_stride;
+// dwords 28	uint32_t d_W_stride;
+//
+// dwords 29	uint32_t f_K_stride;
+// dwords 30	uint32_t f_C_stride;
+// dwords 31	uint32_t f_R_stride;
+// dwords 32	uint32_t f_S_stride;
+//
+// dwords 33	uint32_t o_N_stride;
+// dwords 34	uint32_t o_K_stride;
+// dwords 35	uint32_t o_H_stride;
+// dwords 36	uint32_t o_W_stride;
+
+
+default read_size, 1
+default elem_size, 4
+default xformx_f_size, 4 // 2, 3, 4, 5, 6
+default xformy_f_size, 4 // 2, 3, 4, 5, 6
+default xformx_o_size, 3
+default xformy_o_size, 3
+static_assert(xformx_f_size >=2 && xformx_f_size <= 6)
+static_assert(xformy_f_size >=2 && xformy_f_size <= 6)
+static_assert(xformx_o_size == 3)
+static_assert(xformy_o_size == 3)
+static_assert(xformx_f_size == xformy_f_size)
+static_assert(xformx_o_size == xformy_o_size)
+xform_f_size = xformx_f_size
+xform_o_size = xformx_o_size
+xform_d_size = xform_f_size + xform_o_size - 1
+
+static_assert(read_size == 1)														 
+.GPR_ALLOC_BEGIN
+// initial state
+// s[0:1] - kernarg address
+// s2 - wg x (1 wg per CU)
+kernarg = 0
+gid_x = 2
+stmp = 3
+.SGPR_ALLOC_FROM 4
+// following sgprs should be allocated in strict sequence to follow kernarg layout
+.SGPR_ALLOC N
+.SGPR_ALLOC C
+.SGPR_ALLOC H
+.SGPR_ALLOC W
+
+.SGPR_ALLOC K
+.SGPR_ALLOC n_groups
+.SGPR_ALLOC flags
+.SGPR_ALLOC unused1
+
+.SGPR_ALLOC d_addr, 2
+.SGPR_ALLOC unused2, 2 // filter_addr
+.SGPR_ALLOC o_addr, 2
+.SGPR_ALLOC dbg_addr, 2
+
+.SGPR_ALLOC R
+.SGPR_ALLOC S
+.SGPR_ALLOC pad_h
+.SGPR_ALLOC pad_w
+
+.SGPR_ALLOC out_h
+.SGPR_ALLOC out_w
+
+.SGPR_ALLOC unused3, 2 // bias_addr
+.SGPR_ALLOC unused4 // RELU_alpha
+
+.SGPR_ALLOC d_N_stride
+.SGPR_ALLOC d_C_stride
+.SGPR_ALLOC d_H_stride
+.SGPR_ALLOC d_W_stride
+
+.SGPR_ALLOC f_K_stride
+.SGPR_ALLOC f_C_stride
+.SGPR_ALLOC f_R_stride
+.SGPR_ALLOC f_S_stride
+
+.SGPR_ALLOC o_N_stride
+.SGPR_ALLOC o_C_stride
+.SGPR_ALLOC o_H_stride
+.SGPR_ALLOC o_W_stride
+
+// end of kernarg extent
+
+.SGPR_ALLOC wave_id
+.SGPR_ALLOC soff
+
+.VGPR_ALLOC_FROM 0
+.VGPR_ALLOC tid
+.VGPR_ALLOC vtmp
+accums_cnt = read_size * xform_d_size * xform_d_size
+.VGPR_ALLOC accums, accums_cnt
+.VGPR_ALLOC voff_d
+.VGPR_ALLOC voff_o
+.VGPR_ALLOC vcur_n
+.VGPR_ALLOC vcur_c
+.VGPR_ALLOC vcur_tile
+
+
+
+.GPR_ALLOC_END
+
+
+//.text 0
+//.p2align 8
+gcnAsmWinogradXformOut:
+
+    .amd_kernel_code_t
+        enable_sgpr_kernarg_segment_ptr = 1
+        compute_pgm_rsrc2_tgid_x_en = 1
+        is_ptr64 = 1
+        compute_pgm_rsrc1_vgprs = .AUTO_VGPR_GRANULATED_COUNT
+        compute_pgm_rsrc1_sgprs = .AUTO_SGPR_GRANULATED_COUNT
+        compute_pgm_rsrc2_tidig_comp_cnt = 0
+        compute_pgm_rsrc2_user_sgpr = 2
+        kernarg_segment_byte_size = 148
+        wavefront_sgpr_count = .AUTO_SGPR_COUNT
+        workitem_vgpr_count = .AUTO_VGPR_COUNT
+        float_mode = 192
+        workgroup_group_segment_byte_size = .AUTO_LDS_BYTE_SIZE
+    .end_amd_kernel_code_t
+
+    s_load_dwordx16 s[N:dbg_addr+1], s[kernarg:kernarg+1], 0x0
+    s_load_dwordx16 s[R:f_R_stride], s[kernarg:kernarg+1], 0x4 * 16
+    s_load_dwordx4 s[f_S_stride:o_H_stride], s[kernarg:kernarg+1], 0x4 * 32
+    s_load_dword   s[o_W_stride], s[kernarg:kernarg+1], 0x4 * 36
+    
+    .GPR_REUSE pad_w, const0_25
+    s_mov_b32 s[const0_25], 0.25
+
+    v_lshrrev_b32 v[vtmp], 6, v[tid]
+    //v_readfirstlane_b32 s[wave_id], v[vtmp]
+    s_mov_b32 s[wave_id], s[gid_x]
+    v_and_b32 v[tid], 0x3f, v[tid]
+    
+    s_waitcnt 0
+
+    // compute addresses
+    v_mul_lo_u32 v[vcur_tile], 0+read_size, v[tid]
+    s_mul_i32 s[stmp], read_size * wave_size, s[wave_id]
+    v_add_u32 v[vcur_tile], s[stmp], v[vcur_tile]
+    .GPR_REUSE pad_h, tiles
+    s_mul_i32 s[tiles], s[N], s[K]
+    s_cmp_lt_u32 s[d_N_stride], s[d_C_stride]
+    s_cbranch_scc1 CN_layout
+    NC_layout:
+    u_div v[vcur_tile], s[K], v[vcur_n], vtmp, unused2, dbg_addr
+    v_mul_lo_u32 v[vtmp], s[K], v[vcur_n]
+    v_sub_u32 v[vcur_c], v[vcur_tile], v[vtmp]
+    s_branch CN_layout_end
+    CN_layout:
+    u_div v[vcur_tile], s[N], v[vcur_c], vtmp, unused2, dbg_addr
+    v_mul_lo_u32 v[vtmp], s[N], v[vcur_c]
+    v_sub_u32 v[vcur_n], v[vcur_tile], v[vtmp]
+    CN_layout_end:
+    v_mul_lo_u32 v[vtmp], s[d_C_stride], v[vcur_c]
+    v_mul_lo_u32 v[voff_d], s[d_N_stride], v[vcur_n]
+    v_add_u32 v[voff_d], v[vtmp], v[voff_d]
+    v_mul_lo_u32 v[vtmp], s[o_C_stride], v[vcur_c]
+    v_mul_lo_u32 v[voff_o], s[o_N_stride], v[vcur_n]
+    v_add_u32 v[voff_o], v[vtmp], v[voff_o]
+
+    s_mov_b32 s[soff], 0
+    .GPR_REUSE o_W_stride, buf_step
+    s_mul_i32 s[buf_step], elem_size, s[tiles]
+
+    // mask out of range tiles with read_size granularity
+    v_cmpx_lt_i32 vcc, v[vcur_tile], s[tiles]
+
+    // construct descriptors
+    .GPR_REUSE d_addr, d_desc
+    .GPR_REUSE o_addr, o_desc
+    .GPR_INVALIDATE unused2
+    .GPR_INVALIDATE dbg_addr
+    s_mov_b32 s[d_desc+3], 0x00020000
+    s_mov_b32 s[o_desc+3], 0x00020000
+    s_mul_i32 s[d_desc+2], xform_d_size * xform_d_size, s[d_W_stride]
+    s_min_i32 s[stmp], s[o_C_stride], s[o_N_stride]
+    s_mul_i32 s[o_desc+2], s[stmp], s[tiles]
+
+
+    i=0
+    .rept xform_d_size * xform_d_size
+        acc = accums + read_size * i
+        .if read_size == 1
+            buffer_load_dword v[acc], v[voff_d], s[d_desc:d_desc+3], s[soff] offen
+        .elseif read_size == 2
+            buffer_load_dwordx2 v[acc:acc+1], v[voff_d], s[d_desc:d_desc+3], s[soff] offen
+        .elseif read_size == 3
+            buffer_load_dwordx3 v[acc:acc+2], v[voff_d], s[d_desc:d_desc+3], s[soff] offen
+        .elseif read_size == 4
+            buffer_load_dwordx4 v[acc:acc+3], v[voff_d], s[d_desc:d_desc+3], s[soff] offen
+        .endif
+        s_add_u32 s[soff], s[soff], s[buf_step]
+        i=i+1
+    .endr
+    
+    s_waitcnt 0
+    
+    // inplace xform that could store output in lower addresses
+    .macro m_xform_down f_size, o_size
+        .if \f_size == 2 && \o_size == 3
+            v_add_f32 v[vtmp], v[dx1], v[dx2]
+            v_add_f32 v[ox0], v[vtmp], v[dx0]
+            v_sub_f32 v[ox1], v[dx1], v[dx2]
+            v_add_f32 v[ox2], v[vtmp], v[dx3]
+        .elseif \f_size == 3 && \o_size == 3
+            v_add_f32 v[vtmp], v[dx1], v[dx2]
+            v_sub_f32 v[dx1], v[dx1], v[dx2]
+            v_add_f32 v[dx0], v[dx0], v[dx3]
+            v_fma_f32 v[dx4], v[dx3], 4.0, v[dx4]
+            
+            v_add_f32 v[ox0], v[vtmp], v[dx0]
+            v_fma_f32 v[ox1], v[dx3], 2.0, v[dx1]
+            v_add_f32 v[ox2], v[dx4], v[vtmp]
+        .elseif \f_size == 4 && \o_size == 3
+            v_add_f32 v[vtmp], v[dx1], v[dx2]
+            v_add_f32 v[dx0], v[dx0], v[vtmp]
+            v_add_f32 v[dx5], v[dx5], v[vtmp]
+            v_sub_f32 v[dx1], v[dx1], v[dx2]
+            v_add_f32 v[vtmp], v[dx3], v[dx4]
+            v_sub_f32 v[dx3], v[dx3], v[dx4]
+            
+            v_add_f32 v[ox0], v[vtmp], v[dx0]
+            v_fma_f32 v[ox1], v[dx3], 2.0, v[dx1]
+            v_fma_f32 v[ox2], v[vtmp], 4.0, v[dx5]
+        .elseif \f_size == 5 && \o_size == 3
+            v_add_f32 v[vtmp], v[dx1], v[dx2]
+            v_add_f32 v[dx0], v[dx0], v[dx5]
+            v_fma_f32 v[dx1], v[dx5], 0.5, v[dx1]
+            v_fma_f32 v[dx6], v[dx5], s[const0_25], v[dx6]
+            v_sub_f32 v[dx1], v[dx1], v[dx2]
+            v_add_f32 v[dx0], v[vtmp], v[dx0]
+            v_add_f32 v[dx6], v[vtmp], v[dx6]
+            v_sub_f32 v[dx5], v[dx3], v[dx4]
+            v_add_f32 v[vtmp], v[dx3], v[dx4]
+            
+            v_add_f32 v[ox0], v[dx0], v[vtmp]
+            v_fma_f32 v[ox1], v[dx5], 2.0, v[dx1]
+            v_fma_f32 v[ox2], v[vtmp], 4.0, v[dx6]
+        .elseif \f_size == 6 && \o_size == 3
+            v_add_f32 v[vtmp], v[dx5], v[dx6]
+            v_add_f32 v[dx0], v[vtmp], v[dx0]
+            v_fma_f32 v[dx7], v[vtmp], s[const0_25], v[dx7]
+            v_add_f32 v[vtmp], v[dx1], v[dx2]
+            v_add_f32 v[dx0], v[vtmp], v[dx0]
+            v_add_f32 v[dx7], v[vtmp], v[dx7]
+            v_sub_f32 v[vtmp], v[dx5], v[dx6]
+            v_fma_f32 v[dx1], v[vtmp], 0.5, v[dx1]
+            v_sub_f32 v[dx1], v[dx1], v[dx2]
+            v_sub_f32 v[dx2], v[dx3], v[dx4]
+            v_add_f32 v[vtmp], v[dx3], v[dx4]
+            
+            v_add_f32 v[ox0], v[dx0], v[vtmp]
+            v_fma_f32 v[ox1], v[dx2], 2.0, v[dx1]
+            v_fma_f32 v[ox2], v[vtmp], 4.0, v[dx7]
+        .else
+            static_assert(0)
+        .endif
+    .endm
+    
+    // inplace xform that could store output in upper addresses
+    .macro m_xform_up f_size, o_size
+        .if \f_size == 2 && \o_size == 3
+            v_add_f32 v[vtmp], v[dx1], v[dx2]
+            v_add_f32 v[ox2], v[vtmp], v[dx3]
+            v_sub_f32 v[ox1], v[dx1], v[dx2]
+            v_add_f32 v[ox0], v[vtmp], v[dx0]
+        .elseif \f_size == 3 && \o_size == 3
+            v_add_f32 v[vtmp], v[dx1], v[dx2]
+            v_sub_f32 v[dx1], v[dx1], v[dx2]
+            v_add_f32 v[dx0], v[dx0], v[dx3]
+            v_fma_f32 v[dx4], v[dx3], 4.0, v[dx4]
+            
+            v_add_f32 v[ox2], v[dx4], v[vtmp]
+            v_fma_f32 v[ox1], v[dx3], 2.0, v[dx1]
+            v_add_f32 v[ox0], v[vtmp], v[dx0]
+        .elseif \f_size == 4 && \o_size == 3
+            v_add_f32 v[vtmp], v[dx1], v[dx2]
+            v_add_f32 v[dx0], v[dx0], v[vtmp]
+            v_add_f32 v[dx5], v[dx5], v[vtmp]
+            v_sub_f32 v[dx1], v[dx1], v[dx2]
+            v_add_f32 v[vtmp], v[dx3], v[dx4]
+            v_sub_f32 v[dx3], v[dx3], v[dx4]
+            
+            v_fma_f32 v[ox2], v[vtmp], 4.0, v[dx5]
+            v_fma_f32 v[ox1], v[dx3], 2.0, v[dx1]
+            v_add_f32 v[ox0], v[vtmp], v[dx0]
+        .elseif \f_size == 5 && \o_size == 3
+            v_add_f32 v[vtmp], v[dx1], v[dx2]
+            v_add_f32 v[dx0], v[dx0], v[dx5]
+            v_fma_f32 v[dx1], v[dx5], 0.5, v[dx1]
+            v_fma_f32 v[dx6], v[dx5], s[const0_25], v[dx6]
+            v_sub_f32 v[dx1], v[dx1], v[dx2]
+            v_add_f32 v[dx0], v[vtmp], v[dx0]
+            v_add_f32 v[dx6], v[vtmp], v[dx6]
+            v_sub_f32 v[dx5], v[dx3], v[dx4]
+            v_add_f32 v[vtmp], v[dx3], v[dx4]
+            
+            v_fma_f32 v[ox2], v[vtmp], 4.0, v[dx6]
+            v_fma_f32 v[ox1], v[dx5], 2.0, v[dx1]
+            v_add_f32 v[ox0], v[dx0], v[vtmp]
+        .elseif \f_size == 6 && \o_size == 3
+            v_add_f32 v[vtmp], v[dx5], v[dx6]
+            v_add_f32 v[dx0], v[vtmp], v[dx0]
+            v_fma_f32 v[dx7], v[vtmp], s[const0_25], v[dx7]
+            v_add_f32 v[vtmp], v[dx1], v[dx2]
+            v_add_f32 v[dx0], v[vtmp], v[dx0]
+            v_add_f32 v[dx7], v[vtmp], v[dx7]
+            v_sub_f32 v[vtmp], v[dx5], v[dx6]
+            v_fma_f32 v[dx1], v[vtmp], 0.5, v[dx1]
+            v_sub_f32 v[dx1], v[dx1], v[dx2]
+            v_sub_f32 v[dx5], v[dx3], v[dx4]
+            v_add_f32 v[vtmp], v[dx3], v[dx4]
+            
+            v_fma_f32 v[ox2], v[vtmp], 4.0, v[dx7]
+            v_fma_f32 v[ox1], v[dx5], 2.0, v[dx1]
+            v_add_f32 v[ox0], v[dx0], v[vtmp]
+        .else
+            static_assert(0)
+        .endif
+    .endm
+        
+    // backtransform each column
+    tile=0
+    .rept read_size
+        i=0
+        .rept xform_d_size
+            dx0 = accums + tile + read_size * i
+            dx1 = dx0 + read_size * xform_d_size * 1
+            dx2 = dx0 + read_size * xform_d_size * 2
+            dx3 = dx0 + read_size * xform_d_size * 3 
+            dx4 = dx0 + read_size * xform_d_size * 4
+            dx5 = dx0 + read_size * xform_d_size * 5
+            dx6 = dx0 + read_size * xform_d_size * 6
+            dx7 = dx0 + read_size * xform_d_size * 7
+            ox0 = dx0 + read_size * xform_d_size * (xform_d_size - xform_o_size)
+            ox1 = ox0 + read_size * xform_d_size * 1
+            ox2 = ox0 + read_size * xform_d_size * 2
+            m_xform_up xform_f_size, xform_o_size
+            i=i+1
+        .endr
+        tile=tile+1
+    .endr
+    
+    // compute output offset
+    s_mov_b32 s[soff], 0
+    s_mov_b32 s[buf_step], elem_size * xform_o_size * xform_o_size
+    
+    // backtransform each row
+    tile=0
+    .rept read_size
+        i=0
+        .rept xform_o_size
+            dx0 = accums + tile + read_size * xform_d_size * (xform_d_size - xform_o_size) + read_size * xform_d_size * i
+            dx1 = dx0 + read_size * 1
+            dx2 = dx0 + read_size * 2
+            dx3 = dx0 + read_size * 3
+            dx4 = dx0 + read_size * 4
+            dx5 = dx0 + read_size * 5
+            dx6 = dx0 + read_size * 6
+            dx7 = dx0 + read_size * 7
+            ox0 = accums + i * xform_o_size
+            ox1 = ox0 + 1
+            ox2 = ox0 + 2
+            m_xform_down xform_f_size, xform_o_size
+            i=i+1
+        .endr
+        tile=tile+1
+    
+        buffer_store_dwordx4 v[accums+0:accums+3], v[voff_o], s[o_desc:o_desc+3], s[soff], offen offset:0
+        buffer_store_dwordx4 v[accums+4:accums+7], v[voff_o], s[o_desc:o_desc+3], s[soff], offen offset:16
+        buffer_store_dword v[accums+8], v[voff_o], s[o_desc:o_desc+3], s[soff], offen offset:32
+        s_add_u32 s[soff], s[buf_step], s[soff]
+    .endr
+
+
+
+    s_endpgm
+
+
+.Lfunc_end0:
+    .size gcnAsmWinogradXformOut, .Lfunc_end0 - gcnAsmWinogradXformOut
+
+
+.ifndef ROCM_METADATA_VERSION
+    .error "ROCM_METADATA_VERSION must be defined"
+.end
+.endif
+
+.macro METADATA wg_x, lds_size
+  .if ROCM_METADATA_VERSION == 4
+    .amd_amdgpu_hsa_metadata
+    { Version: [ 1, 0 ],
+        Kernels:
+        - { Name: gcnAsmWinogradXformOut, SymbolName: 'gcnAsmWinogradXformOut@kd', Language: OpenCL C, LanguageVersion: [ 1, 2 ],
+            Attrs:
+              { ReqdWorkGroupSize: [ \wg_x, 1, 1 ] }
+            CodeProps:
+              { KernargSegmentSize: 148, GroupSegmentFixedSize: \lds_size, PrivateSegmentFixedSize: 0, KernargSegmentAlign: 8, WavefrontSize: 64, MaxFlatWorkGroupSize: \wg_x }
+            Args:
+            - { Name: N       , Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: C       , Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: H       , Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: W       , Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }                    
+            - { Name: K       , Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: n_groups, Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: flags   , Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: unused_1, Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: filter_ptr      , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F32, TypeName: 'float*', AddrSpaceQual: Global, AccQual: Default}
+            - { Name: reserved2       , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F32, TypeName: 'float*', AddrSpaceQual: Global, AccQual: Default}
+            - { Name: x_filter_ptr    , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F32, TypeName: 'float*', AddrSpaceQual: Global, AccQual: Default}
+            - { Name: ret_addr        , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F32, TypeName: 'float*'  , AddrSpaceQual: Global, AccQual: Default }
+            - { Name: R       , Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }                    
+            - { Name: S       , Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: pad_h, Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: pad_w, Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: out_h, Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: out_w, Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: reserved3       , Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }                    
+            - { Name: reserved4       , Size: 4, Align: 4, ValueKind: ByValue, ValueType: F32, TypeName: 'float', AccQual: Default, IsConst: true }
+            - { Name: d_N_stride, Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: d_C_stride, Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: d_H_stride, Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: d_W_stride, Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: reserved5       , Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }                    
+            - { Name: reserved6       , Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }                    
+            - { Name: reserved7       , Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }                    
+            - { Name: reserved8       , Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: o_N_stride, Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: o_C_stride, Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: o_H_stride, Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+            - { Name: o_W_stride, Size: 4, Align: 4, ValueKind: ByValue, ValueType: I32, TypeName: 'int', AccQual: Default, IsConst: true }
+          }
+    }
+    .end_amd_amdgpu_hsa_metadata
+  .else
+    .error "Unsupported ROCM_METADATA_VERSION"
+    .end
+  .endif
+.endm
+
+.altmacro
+
+.macro METADATA_WRAPPER wg_x, lds_size
+    METADATA %\wg_x, %\lds_size
+.endm
+
+METADATA_WRAPPER 64, .AUTO_LDS_BYTE_SIZE
+
+    /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+	.hsa_code_object_version 2,1
+
+	.hsa_code_object_isa 
+
+	.text
+	.amdgpu_hsa_kernel gcnAsmBNBwdTrainSpatial
+
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+
+.set __auto_gpr_count_guard, 1
+
+.set .WAVE_SIZE, 64
+.set .WAVE_SIZE_LOG2, 6
+.set .MAX_VGPRS, 256
+.set .MAX_SGPRS, 102
+.set .MAX_LDS, 65536
+
+.macro .GPR_ALLOC_BEGIN
+    .set .AVAILABLE_VGPRS, .MAX_VGPRS
+    .set .AVAILABLE_SGPRS, .MAX_SGPRS
+	.set .AVAILABLE_LDS, .MAX_LDS
+	.set .SGPR_NEXT_FREE, 0
+	.set .VGPR_NEXT_FREE, 0
+	.set .LDS_NEXT_FREE, 0
+	.set .AUTO_VGPR_COUNT, 0
+	.set .AUTO_SGPR_COUNT, 0
+	.set .AUTO_LDS_BYTE_SIZE, 0
+.ifnotdef EXPERIMENTAL_COv3	
+	.set .AUTO_VGPR_GRANULATED_COUNT, 0
+	.set .AUTO_SGPR_GRANULATED_COUNT, 0
+.endif	
+	.set __sgpr_reserve_vcc, 0
+	.set __sgpr_reserve_xnack, 0
+	.set __sgpr_reserve_flatscr, 0
+	.set __auto_gpr_count_guard, 0
+	.set __max_waves_limit, 10
+	.set __min_waves_limit, 1
+.endm
+
+.macro .CHECK_SGPR_ALLOCATION gprs_to_allocate=0
+	.if (.SGPR_NEXT_FREE + \gprs_to_allocate) > .AVAILABLE_SGPRS
+		.error "Error: out of free sgprs"
+        .end
+	.endif
+.endm
+
+.macro .CHECK_VGPR_ALLOCATION gprs_to_allocate=0
+	.if (.VGPR_NEXT_FREE + \gprs_to_allocate) > .AVAILABLE_VGPRS
+		.error "Error: out of free vgprs"
+        .end
+	.endif
+.endm
+
+.macro .CHECK_LDS_ALLOCATION bytes_to_allocate=0
+	.if (.LDS_NEXT_FREE + \bytes_to_allocate) > .AVAILABLE_LDS
+		.error "Error: out of free lds"
+        .end
+	.endif
+.endm
+
+.macro .GPRS_FOR_WAVE_LIMIT waves_per_simd, sgprs, vgprs
+    .if \waves_per_simd == 10
+	    \sgprs = 80
+		\vgprs = 24
+	.elseif \waves_per_simd == 9
+	    \sgprs = 96
+		\vgprs = 28
+	.elseif \waves_per_simd == 8
+	    \sgprs = 96
+		\vgprs = 32
+	.elseif \waves_per_simd == 7
+	    \sgprs = 102
+		\vgprs = 36
+	.elseif \waves_per_simd == 6
+	    \sgprs = 102
+		\vgprs = 40
+	.elseif \waves_per_simd == 5
+	    \sgprs = 102
+		\vgprs = 48
+	.elseif \waves_per_simd == 4
+	    \sgprs = 102
+		\vgprs = 64
+	.elseif \waves_per_simd == 3
+	    \sgprs = 102
+		\vgprs = 84
+	.elseif \waves_per_simd == 2
+	    \sgprs = 102
+		\vgprs = 128
+	.else
+	    \sgprs = 102
+		\vgprs = 256
+	.endif
+.endm
+
+.macro .SET_MIN_WAVES_LIMIT waves_per_simd
+    .if \waves_per_simd > 10
+		.error "Error: max 10 waves per simd is available"
+	.endif
+	.GPRS_FOR_WAVE_LIMIT \waves_per_simd, .AVAILABLE_SGPRS, .AVAILABLE_VGPRS
+	.CHECK_SGPR_ALLOCATION
+	.CHECK_VGPR_ALLOCATION
+	__min_waves_limit = \waves_per_simd
+	.if __min_waves_limit > __max_waves_limit
+	    .error "Error: __min_waves_limit > __max_waves_limit"
+	.endif
+.endm
+
+.macro .SET_MAX_WAVES_LIMIT waves_per_simd
+    .if \waves_per_simd < 1
+		.error "Error: waves per simd should be > 0"
+	.endif
+	__max_waves_limit = \waves_per_simd
+	.if __min_waves_limit > __max_waves_limit
+	    .error "Error: __min_waves_limit > __max_waves_limit"
+	.endif
+.endm
+
+
+.macro .GPR_ALLOC_END
+    .if __auto_gpr_count_guard == 1
+	    .error "Error: unpaired .GPR_ALLOC_END. Please invoke .GPR_ALLOC_BEGIN before each kernel."
+	.endif
+	.CHECK_SGPR_ALLOCATION
+	.CHECK_VGPR_ALLOCATION
+	.CHECK_LDS_ALLOCATION
+	__sgpr_additional_count = 2 * (__sgpr_reserve_flatscr + __sgpr_reserve_xnack + __sgpr_reserve_vcc)
+	.GPRS_FOR_WAVE_LIMIT __max_waves_limit, .AUTO_SGPR_COUNT, .AUTO_VGPR_COUNT
+	.if .AUTO_VGPR_COUNT < .VGPR_NEXT_FREE
+	    .AUTO_VGPR_COUNT = .VGPR_NEXT_FREE
+	.endif
+	.if .AUTO_SGPR_COUNT < (.SGPR_NEXT_FREE + __sgpr_additional_count)
+	    .AUTO_SGPR_COUNT = (.SGPR_NEXT_FREE + __sgpr_additional_count)
+	.endif
+.ifnotdef EXPERIMENTAL_COv3	
+	.AUTO_VGPR_GRANULATED_COUNT = (.AUTO_VGPR_COUNT - 1)/4
+	.AUTO_SGPR_GRANULATED_COUNT = (.AUTO_SGPR_COUNT - 1)/8
+.endif	
+	.AUTO_LDS_BYTE_SIZE = .LDS_NEXT_FREE
+    __auto_gpr_count_guard = 1
+.endm
+
+.macro .VGPR_ALLOC_FROM __vgpr_alloc_from
+    .set .VGPR_NEXT_FREE, \__vgpr_alloc_from
+.endm
+
+.macro .SGPR_ALLOC_FROM __sgpr_alloc_from
+    .set .SGPR_NEXT_FREE, \__sgpr_alloc_from
+.endm
+
+.macro .LDS_ALLOC_FROM __lds_alloc_from
+	.set .LDS_NEXT_FREE, \__lds_alloc_from
+.endm
+
+.macro .SGPR_RESERVE_FLATSCR
+    .set __sgpr_reserve_flatscr, 1
+.endm
+
+.macro .SGPR_RESERVE_XNACK
+    .set __sgpr_reserve_xnack, 1
+.endm
+
+.macro .SGPR_RESERVE_VCC
+    .set __sgpr_reserve_vcc, 1
+.endm
+
+.macro .VGPR_ALLOC __vgpr_number_symbolic, __vgpr_numregs=1
+    .CHECK_VGPR_ALLOCATION \__vgpr_numregs
+    .set \__vgpr_number_symbolic, .VGPR_NEXT_FREE
+    .set .VGPR_NEXT_FREE, .VGPR_NEXT_FREE + \__vgpr_numregs
+.endm
+
+.macro .SGPR_ALLOC __sgpr_number_symbolic, __sgpr_numregs=1, __sgpr_alignment=0
+    .CHECK_SGPR_ALLOCATION \__sgpr_numregs
+	.if \__sgpr_alignment > 0
+		.set __sgpr_effective_alignment, \__sgpr_alignment
+	.elseif \__sgpr_numregs > 4
+		.set __sgpr_effective_alignment, 4
+	.else
+		.set __sgpr_effective_alignment, \__sgpr_numregs
+	.endif
+    .if .SGPR_NEXT_FREE % __sgpr_effective_alignment != 0
+		.error "Error: unaligned register"
+    .endif
+    .set \__sgpr_number_symbolic, .SGPR_NEXT_FREE
+    .set .SGPR_NEXT_FREE, .SGPR_NEXT_FREE + \__sgpr_numregs
+.endm
+
+.macro .LDS_ALLOC __lds_ptr_name, __bytes_to_allocate, __alignment_size=1
+	.if .LDS_NEXT_FREE % \__alignment_size != 0
+		.LDS_ALLOC_FROM ((.LDS_NEXT_FREE / \__alignment_size) + 1) * \__alignment_size
+	.endif
+	.CHECK_LDS_ALLOCATION \__bytes_to_allocate
+	.set \__lds_ptr_name, .LDS_NEXT_FREE
+	.set .LDS_NEXT_FREE, .LDS_NEXT_FREE + \__bytes_to_allocate
+.endm
+
+.macro .SGPR_ALLOC_ONCE __sgpr_symbolic, __sgpr_numregs=1, __sgpr_alignment=0
+	.ifndef __guard_sgpr_\__sgpr_symbolic
+		__guard_sgpr_\__sgpr_symbolic = 0
+	.endif
+	.if __guard_sgpr_\__sgpr_symbolic == 0
+		__guard_sgpr_\__sgpr_symbolic = 1
+		.SGPR_ALLOC \__sgpr_symbolic, \__sgpr_numregs, \__sgpr_alignment
+	.endif
+.endm
+
+.macro .GPR_INVALIDATE __gpr_symbolic
+	.set \__gpr_symbolic, 0x7fffffff /* invalidate (intentionally to the middle of the int range) */
+.endm
+
+.macro .GPR_REUSE __gpr_number_symbolic_old, __gpr_number_symbolic_new
+    .set \__gpr_number_symbolic_new, \__gpr_number_symbolic_old
+    .GPR_INVALIDATE \__gpr_number_symbolic_old
+.endm
+
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+
+.ifdef EXPERIMENTAL_COv3
+    .ifdef .option.machine_version_major
+        .error ".option.machine_version_major already defined"
+        .end
+    .endif
+    .set .option.machine_version_major, .amdgcn.gfx_generation_number
+.endif
+
+LAYOUT_DATA_NCHW = 0
+LAYOUT_DATA_CNHW = 1
+LAYOUT_DATA_NHWC = 2
+LAYOUT_DATA_CHWN = 3
+
+// acc_type and buf_type: 0 - FP64, 1 - FP32, 2 - FP16, 5 - int32, 6 - int16, 7 - int8
+TYPE_FP64  = 0
+TYPE_FP32  = 1
+TYPE_FP16  = 2
+TYPE_BFP16 = 3
+TYPE_INT64 = 4
+TYPE_INT32 = 5
+TYPE_INT16 = 6
+TYPE_INT8  = 7
+TYPE_INT4  = 8
+
+.macro log2 lg2, num, max_bits=8
+    \lg2 = 0
+    lg_i = \num
+    .rept \max_bits
+        lg_i = lg_i / 2
+        .if lg_i > 0
+            \lg2 = \lg2 + 1
+        .endif
+    .endr
+.endm
+
+.macro default symbol, value
+    .ifnotdef \symbol
+        \symbol = \value
+    .endif
+.endm
+
+.macro static_assert fufufu
+    .if !\fufufu
+        .error "\fufufu is false"
+        .end
+    .endif
+.endm
+
+.macro swap a, b
+    __tmp = \a
+    \a = \b
+    \b = __tmp
+.endm
+
+.macro m_bpermute vgpr, cnt, addr
+    v = \vgpr
+    .rept \cnt
+        ds_bpermute_b32 v[v], v[\addr], v[v]
+        v = v + 1
+    .endr
+.endm
+
+.macro m_swizzle vgpr, cnt, pattern
+    v = \vgpr
+    .rept \cnt
+        ds_swizzle_b32 v[v], v[v] offset:\pattern
+        v = v + 1
+    .endr
+.endm
+
+.if (.option.machine_version_major == 8)
+    .set max_hw_vctn, 15
+.elseif (.option.machine_version_major == 9)
+    .set max_hw_vctn, 63
+.endif
+max_hw_lcnt = 15
+.macro s_wait vmcnt=max_hw_vctn, lgkmcnt=max_hw_lcnt
+    vm_cnt = \vmcnt
+    lgkm_cnt = \lgkmcnt
+    .if vm_cnt > max_hw_vctn
+        vm_cnt = max_hw_vctn
+    .elseif vm_cnt < 0
+        vm_cnt = 0
+    .endif
+    .if lgkm_cnt > max_hw_lcnt
+        lgkm_cnt = max_hw_lcnt
+    .elseif lgkm_cnt < 0
+        lgkm_cnt = 0
+    .endif
+    s_waitcnt vmcnt(0 + vm_cnt) & lgkmcnt(0 + lgkm_cnt)
+.endm
+
+
+maxU24 = 1 << 24
+
+wave_size = 64
+log2 wave_size_log2, wave_size
+
+.macro m_buffer_load_dwordx size, dst, off, desc, soff, ioff=0
+    .if \size == 1
+        buffer_load_dword v[\dst], v[\off], s[\desc:\desc + 3], s[\soff] offen offset:0+\ioff
+    .elseif \size == 2
+        buffer_load_dwordx2 v[\dst:\dst+\size-1], v[\off], s[\desc:\desc + 3], s[\soff] offen offset:0+\ioff
+    .elseif \size == 3
+        buffer_load_dwordx3 v[\dst:\dst+\size-1], v[\off], s[\desc:\desc + 3], s[\soff] offen offset:0+\ioff
+    .elseif \size == 4
+        buffer_load_dwordx4 v[\dst:\dst+\size-1], v[\off], s[\desc:\desc + 3], s[\soff] offen offset:0+\ioff
+    .endif
+.endm
+
+.macro m_buffer_load_ushort size, dst, off, desc, soff, ioff=0
+    .if \size == 1
+        buffer_load_ushort v[\dst], v[\off],  s[\desc:\desc + 3], s[\soff] offen offset:0+\ioff
+    .endif
+.endm
+
+.macro m_buffer_store_short size, src, off, desc, soff, ioff=0
+    .if \size == 1
+        buffer_store_short v[\src], v[\off],  s[\desc:\desc + 3], s[\soff] offen offset:0+\ioff
+    .endif
+.endm
+
+.macro u32_div numer, denom, uquo, v_tmp, s_tmp
+    u_div   v[\numer], v[\denom] v[\uquo], \v_tmp, \s_tmp, \s_tmp + 2 
+.endm
+
+
+// Unsigned division function from the SC implementation
+// 4 s_tmps, 4 v_tmps
+//
+.macro u_div numer, denom, uquo, vtmp, stmp1, stmp2
+    v_cvt_f32_u32     v[\vtmp],     \denom
+    v_rcp_f32         v[\vtmp],     v[\vtmp]
+    v_mul_f32         v[\vtmp],     0x4f800000,   v[\vtmp]
+    v_cvt_u32_f32     v[\vtmp],     v[\vtmp]
+
+    v_mul_lo_u32      v[\vtmp+1],   \denom,       v[\vtmp]
+    v_mul_hi_u32      v[\vtmp+2],   \denom,       v[\vtmp]
+   _v_sub_co_u32      v[\vtmp+3],   vcc,          0,           v[\vtmp+1]
+    v_cmp_ne_i32      s[\stmp1:\stmp1+1], 0,      v[\vtmp+2]
+    v_cndmask_b32     v[\vtmp+1],   v[\vtmp+3],   v[\vtmp+1],  s[\stmp1:\stmp1+1]
+    v_mul_hi_u32      v[\vtmp+1],   v[\vtmp+1],   v[\vtmp]
+   _v_sub_co_u32      v[\vtmp+2],   vcc,          v[\vtmp],    v[\vtmp+1]
+    v_add_co_u32      v[\vtmp],     vcc,          v[\vtmp],    v[\vtmp+1]
+    v_cndmask_b32     v[\vtmp],     v[\vtmp],     v[\vtmp+2],  s[\stmp1:\stmp1+1]
+    v_mul_hi_u32      v[\vtmp],     v[\vtmp],     \numer
+    v_mul_lo_u32      v[\vtmp+1],   v[\vtmp],     \denom
+   _v_sub_co_u32      v[\vtmp+2],   vcc,          \numer,      v[\vtmp+1]
+    v_cmp_ge_u32      s[\stmp1:\stmp1+1],         \numer,      v[\vtmp+1]
+    v_cmp_ge_u32      s[\stmp2:\stmp2+1],         v[\vtmp+2],  \denom
+   _v_add_co_u32      v[\vtmp+2],   vcc,          1,           v[\vtmp]
+    s_and_b64         s[\stmp2:\stmp2+1], s[\stmp1:\stmp1+1],  s[\stmp2:\stmp2+1]
+   _v_add_co_u32      v[\vtmp+1],   vcc, -1,      v[\vtmp]
+    v_cndmask_b32     v[\vtmp+2],   v[\vtmp],     v[\vtmp+2],  s[\stmp2:\stmp2+1]
+    v_cndmask_b32     v[\vtmp+2],   v[\vtmp+1],   v[\vtmp+2],  s[\stmp1:\stmp1+1]
+    v_cmp_ne_i32      vcc,          0,            \denom
+    v_cndmask_b32     \uquo,        -1,           v[\vtmp+2],  vcc
+.endm
+
+.altmacro
+.macro ceil_2_32_div_u16 m, denom, vtmp, stmp
+	v_cvt_f32_u32     v[\vtmp],     \denom
+	v_rcp_f32         v[\vtmp],     v[\vtmp]
+	v_mul_f32         v[\vtmp],     0x4f800000,   v[\vtmp]
+	v_cvt_u32_f32     v[\vtmp],     v[\vtmp]
+
+	v_mul_lo_u32      v[\vtmp+1],   \denom,       v[\vtmp]
+	v_mul_hi_u32      v[\vtmp+2],   \denom,       v[\vtmp]
+	v_sub_u32         v[\vtmp+3],   0,            v[\vtmp+1]
+	v_cmp_ne_i32      s[\stmp:\stmp+1], 0,        v[\vtmp+2]
+	v_cndmask_b32     v[\vtmp+1],   v[\vtmp+3],   v[\vtmp+1],  s[\stmp:\stmp+1]
+	v_mul_hi_u32      v[\vtmp+1],   v[\vtmp+1],   v[\vtmp]
+	v_sub_u32         v[\vtmp+2],   v[\vtmp],     v[\vtmp+1]
+	v_add_co_u32      v[\vtmp],     vcc,          v[\vtmp],    v[\vtmp+1]
+	v_cndmask_b32     v[\vtmp],     v[\vtmp],     v[\vtmp+2],  s[\stmp:\stmp+1]
+	v_mul_hi_u32      v[\vtmp],     -1,           v[\vtmp]
+	v_mul_lo_u32      v[\vtmp+1],   v[\vtmp],     \denom
+	v_sub_u32         v[\vtmp+2],   -1,           v[\vtmp+1]
+	v_cmp_ge_u32      s[\stmp:\stmp+1],           v[\vtmp+2],  \denom
+	v_add_u32         v[\vtmp+2],   1,            v[\vtmp]
+	v_add_co_u32      v[\vtmp+1],   vcc, -1,      v[\vtmp]
+	v_cndmask_b32     v[\vtmp+2],   v[\vtmp],     v[\vtmp+2],  s[\stmp:\stmp+1]
+	v_add_u32         v[\vtmp+2],   1,            v[\vtmp+2]
+	v_cmp_ne_i32      vcc,          0,            \denom
+	v_cndmask_b32     \m,        -1,           v[\vtmp+2],  vcc
+.endm
+
+.macro disable_srd srd
+	s_mov_b32 s[\srd+3], 0
+.endm
+.macro enable_srd srd
+	s_mov_b32 s[\srd+3], 0x00020000            // DATA_FORMAT, need to just be non-zero;
+.endm
+
+.macro label l, n
+	\l\n:
+.endm
+.macro _s_cbranch cond, l, n
+	s_cbranch_\cond \l\n
+.endm
+.macro _s_branch l, n
+	s_branch \l\n
+.endm
+
+
+div_const_1_2=0x80000000
+div_const_1_3=0x55555556
+div_const_1_4=0x40000000
+div_const_1_5=0x33333334
+div_const_1_6=0x2aaaaaab
+div_const_1_7=0x24924925
+div_const_1_8=0x20000000
+div_const_1_9=0x1c71c71d
+div_const_1_10=0x1999999a
+div_const_1_11=0x1745d175
+div_const_1_12=0x15555556
+div_const_1_13=0x13b13b14
+div_const_1_14=0x12492493
+div_const_1_15=0x11111112
+div_const_1_16=0x10000000
+div_const_1_17=0x0f0f0f10
+div_const_1_18=0x0e38e38f
+div_const_1_19=0x0d79435f
+div_const_1_20=0x0ccccccd
+div_const_1_21=0x0c30c30d
+div_const_1_22=0x0ba2e8bb
+div_const_1_23=0x0b21642d
+div_const_1_24=0x0aaaaaab
+div_const_1_25=0x0a3d70a4
+div_const_1_26=0x09d89d8a
+div_const_1_27=0x097b425f
+div_const_1_28=0x0924924a
+div_const_1_29=0x08d3dcb1
+div_const_1_30=0x08888889
+div_const_1_31=0x08421085
+div_const_1_32=0x08000000
+div_const_1_33=0x07c1f07d
+div_const_1_34=0x07878788
+div_const_1_35=0x07507508
+div_const_1_36=0x071c71c8
+div_const_1_37=0x06eb3e46
+div_const_1_38=0x06bca1b0
+div_const_1_39=0x06906907
+div_const_1_40=0x06666667
+div_const_1_41=0x063e7064
+div_const_1_42=0x06186187
+div_const_1_43=0x05f417d1
+div_const_1_44=0x05d1745e
+div_const_1_45=0x05b05b06
+div_const_1_46=0x0590b217
+div_const_1_47=0x0572620b
+div_const_1_48=0x05555556
+div_const_1_49=0x0539782a
+div_const_1_50=0x051eb852
+div_const_1_51=0x05050506
+div_const_1_52=0x04ec4ec5
+div_const_1_53=0x04d4873f
+div_const_1_54=0x04bda130
+div_const_1_55=0x04a7904b
+div_const_1_56=0x04924925
+div_const_1_57=0x047dc120
+div_const_1_58=0x0469ee59
+div_const_1_59=0x0456c798
+div_const_1_60=0x04444445
+div_const_1_61=0x04325c54
+div_const_1_62=0x04210843
+div_const_1_63=0x04104105
+div_const_1_64=0x04000000
+
+.macro _s_div_const_u32_u16 dst, src, denum
+	.if \denum == 1
+		s_mov_b32 \dst, \src
+	.elseif \denum >=2 && \denum <= 64
+		s_mul_hi_u32 \dst, div_const_1_\denum, \src
+	.else
+		static_assert(0)
+	.endif
+.endm
+
+.macro _v_div_const_u32_u16 dst, src, denum, tmp
+	.if \denum == 1
+		v_mov_b32 \dst, \src
+	.elseif \denum >=2 && \denum <= 64
+		s_mov_b32 \tmp, div_const_1_\denum
+		v_mul_hi_u32 \dst, \tmp, \src
+	.else
+		static_assert(0)
+	.endif
+.endm
+
+.macro _s_ceil_u32 dst, src, denum
+	s_add_u32 \dst, \denum - 1, \src
+	_s_div_const_u32_u16 \dst, \dst, \denum
+.endm
+
+/*******************************************************************************
+ * 
+ * MIT License
+ * 
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ *******************************************************************************/
+
+// Wrapper macros for some instructions.
+// Macros contain workarounds for some assembler bugs.
+// Also these allow for unifying source text when different
+// ISA versions require different assembler syntax (mostly mnemonics).
+
+.if ((.option.machine_version_major == 8) || (.option.machine_version_major == 9))
+.else
+    .error "Only Gfx8 and Gfx9 ISA is supported"
+    .end
+.endif
+
+.ifndef WORKAROUND_BUG_34765
+    .set WORKAROUND_BUG_34765,0
+.endif
+
+// Let's use Gfx10-like naming conventions for wrapper macros.
+// ADD_NC
+.macro _v_add_nc_u32 dst, src0, src1, dpp=
+    .if (.option.machine_version_major == 8)
+        // None No-Carry instruction in Gfx8, modifies VCC.
+        v_add_u32 \dst, vcc, \src0, \src1 \dpp
+    .else
+        v_add_u32 \dst, \src0, \src1 \dpp
+    .endif
+.endm
+
+// SUB_NC
+.macro _v_sub_nc_u32 dst, src0, src1, dpp=
+    .if (.option.machine_version_major == 8)
+        // None No-Carry instruction in Gfx8, modifies VCC.
+        v_sub_u32 \dst, vcc, \src0, \src1 \dpp
+    .else
+        v_sub_u32 \dst, \src0, \src1 \dpp
+    .endif
+.endm
+
+// ADD_CO (gfx8 add)
+.macro _v_add_co_u32 dst, co, src0, src1, dpp=
+    .if ((.option.machine_version_major == 8) || ((.option.machine_version_major == 9) && (WORKAROUND_BUG_34765 == 1)))
+        v_add_u32 \dst, \co, \src0, \src1 \dpp
+    .else
+        v_add_co_u32 \dst, \co, \src0, \src1 \dpp
+    .endif
+.endm
+
+// ADD_CO_CI (gfx8 addc)
+.macro _v_add_co_ci_u32 dst, co, src0, src1, ci, dpp=
+    .if ((.option.machine_version_major == 8) || ((.option.machine_version_major == 9) && (WORKAROUND_BUG_34765 == 1)))
+		v_addc_u32 \dst, \co, \src0, \src1, \ci \dpp
+    .else
+		v_addc_co_u32 \dst, \co, \src0, \src1, \ci \dpp
+    .endif
+.endm
+
+// SUB_CO (gfx8 sub)
+.macro _v_sub_co_u32 dst, co, src0, src1, dpp=
+    .if ((.option.machine_version_major == 8) || ((.option.machine_version_major == 9) && (WORKAROUND_BUG_34765 == 1)))
+        v_sub_u32 \dst, \co, \src0, \src1 \dpp
+    .else
+        v_sub_co_u32 \dst, \co, \src0, \src1 \dpp
+    .endif
+.endm
+
+// SUBREV_CO (gfx8 subrev)
+.macro _v_subrev_co_u32 dst, co, src0, src1, dpp=
+    .if ((.option.machine_version_major == 8) || ((.option.machine_version_major == 9) && (WORKAROUND_BUG_34765 == 1)))
+        v_subrev_u32 \dst, \co, \src0, \src1 \dpp
+    .else
+        v_subrev_co_u32 \dst, \co, \src0, \src1 \dpp
+    .endif
+.endm
+
+.macro v_dot2 acc, in, out
+    .if (.option.machine_version_major == 9) && (.option.machine_version_minor == 0) && (.option.machine_version_stepping == 6)
+        v_dot2_f32_f16 v[\acc], v[\in], v[\out], v[\acc]
+    .elseif (.option.machine_version_major == 9) && (.option.machine_version_stepping > 2)
+        v_fma_mix_f32 v[\acc], v[\in], v[\out], v[\acc] op_sel:[0,0,0] op_sel_hi:[1,1,0]
+        v_fma_mix_f32 v[\acc], v[\in], v[\out], v[\acc] op_sel:[1,1,0] op_sel_hi:[1,1,0]
+    .else
+        v_mad_mix_f32 v[\acc], v[\in], v[\out], v[\acc] op_sel:[0,0,0] op_sel_hi:[1,1,0]
+        v_mad_mix_f32 v[\acc], v[\in], v[\out], v[\acc] op_sel:[1,1,0] op_sel_hi:[1,1,0]
+    .endif
+.endm
+
+
+
+
+// kernarg layout:
+kernarg = 4
+in_desc = 0
+.set x_in_ptr_off, 0x0
+.set dy_in_ptr_off, 0x8
+.set dx_out_ptr_off, 0x10
+.set bnScale_ptr_off, 0x18
+.set dscale_ptr_off, 0x20
+.set dbias_ptr_off, 0x28
+.if (MIO_BN_USESAVED == 0)
+    .set epsilon_off, 0x30
+    .set inhw_off, 0x38
+.elseif (MIO_BN_USESAVED == 1) 
+    .set SavedMean_off, 0x30
+    .set SavedInvVariance_off, 0x38
+    .set inhw_off, 0x40
+.endif
+
+madmix_instructions_available = 0
+fmamix_instructions_available = 0
+.if (.option.machine_version_major == 9)
+    .if(.option.machine_version_stepping > 2)
+        fmamix_instructions_available = 1
+    .else
+        madmix_instructions_available = 1
+    .endif
+.endif
+
+.GPR_ALLOC_BEGIN
+
+    //.SGPR_ALLOC_FROM 4
+    .SGPR_ALLOC_FROM 0
+    .SGPR_ALLOC stmp,8 
+    .SGPR_ALLOC soffset_in, 2  //8
+    .SGPR_ALLOC soffset_dy_in, 2 //10
+    .SGPR_ALLOC soffset_dscale, 2 //12 
+    .SGPR_ALLOC soffset_dbias, 2  //14
+    .SGPR_ALLOC soffset_dx_out, 2 //16
+    .SGPR_ALLOC soffset_inhw //18
+    .SGPR_ALLOC stmp8 //19 
+    .SGPR_ALLOC stmp9 //20
+    .SGPR_ALLOC stmp10 //21
+    .SGPR_RESERVE_XNACK
+
+    .VGPR_ALLOC_FROM 0
+    .VGPR_ALLOC tid
+    .VGPR_ALLOC vtmp1, 2
+    .VGPR_ALLOC v_db //v3 
+    .VGPR_ALLOC v_ds //v4
+    .VGPR_ALLOC qtmp2, 4 //v5-v8
+    .VGPR_ALLOC qtmp3, 4 //v9-v12
+    .VGPR_ALLOC qtmp4, 4 //13-v16
+    .VGPR_ALLOC qtmp5, 4 //v17-v20
+
+    //.LDS_ALLOC_FROM 0
+    //.LDS_ALLOC accums_lds, 10
+
+.GPR_ALLOC_END
+
+gcnAsmBNBwdTrainSpatial:
+
+	.amd_kernel_code_t
+		kernel_code_entry_byte_offset = 256
+		granulated_workitem_vgpr_count = .AUTO_VGPR_GRANULATED_COUNT
+		granulated_wavefront_sgpr_count = .AUTO_SGPR_GRANULATED_COUNT 
+		//float_mode = 240
+		float_mode = 192
+		user_sgpr_count = 6
+		enable_sgpr_workgroup_id_x = 1
+		enable_sgpr_private_segment_buffer = 1
+		enable_sgpr_kernarg_segment_ptr = 1
+		private_element_size = 1
+		is_ptr64 = 1
+		workgroup_group_segment_byte_size = 44
+		kernarg_segment_byte_size = 120
+		wavefront_sgpr_count = .AUTO_SGPR_COUNT 
+		workitem_vgpr_count = .AUTO_VGPR_COUNT
+		kernarg_segment_alignment = 4
+		group_segment_alignment = 4
+		private_segment_alignment = 4
+	.end_amd_kernel_code_t
+
+  // s[kernarg:kernarg+1] - kernel arg base address...
+  // V0 - work item id...
+  // s8: group ID 
+	s_load_dwordx2 s[soffset_in:soffset_in+1], s[kernarg:kernarg+1], 0x0 + x_in_ptr_off                  
+	s_load_dwordx2 s[soffset_dy_in:soffset_dy_in+1], s[kernarg:kernarg+1], 0x0 + dy_in_ptr_off
+	s_mov_b32 s[stmp+7], 0                                     
+  // set an equal to zero executive mask for first thread (==0)
+	v_cmp_eq_u32 s[stmp:stmp+1], 0, v[tid]                      
+  // save current exec mask in s[stmp+2:stmp+3] which is not equal to zero      
+	s_and_saveexec_b64 s[stmp+2:stmp+3], s[stmp:stmp+1]                   
+	s_cbranch_execz skip_bnScale_update                               
+
+    //.SGPR_ALLOC soffset_dscale, 2 //12 
+    //.SGPR_ALLOC soffset_dbias, 2  //14
+    // .SGPR_ALLOC soffset_dx_out, 2 //16
+    //.SGPR_ALLOC soffset_inhw //18
+
+        stemp1 = soffset_dx_out //16
+        stemp2 = soffset_dscale //12
+        stemp3 = soffset_inhw //18
+	s_load_dwordx2 s[stemp1:stemp1+1], s[kernarg:kernarg+1], 0x0 + bnScale_ptr_off
+	s_load_dwordx4 s[stemp2:stemp2+3], s[kernarg:kernarg+1], 0x0 + SavedMean_off
+  // shift grpid by 2 for adding to memory offset 
+	s_lshl_b64 s[stemp3:stemp3+1], s[stmp+6:stmp+7], 2                      
+	v_mov_b32 v[vtmp1], 0                                 
+	s_waitcnt lgkmcnt(0)                                
+  // shift grpid by 2 for adding to byte memory offset 
+  // (bnScale + grpid)
+	s_add_u32 s[stemp1], s[stemp1], s[stemp3]                             
+	s_addc_u32 s[stemp1+1], s[stemp1+1], s[stemp3+1]                            
+	s_add_u32 s[stemp2], s[stemp2], s[stemp3]                             
+	s_addc_u32 s[stemp2+1], s[stemp2+1], s[stemp3+1]                            
+	s_add_u32 s[stemp2+2], s[stemp2+2], s[stemp3]                             
+	s_addc_u32 s[stemp2+3], s[stemp2+3], s[stemp3+1]                            
+  // *(bnScale + grpid)
+  // *(savedMean + grpid)
+  // *(savedInvVariance + grpid)
+	s_load_dword s[stemp1], s[stemp1:stemp1+1], 0x0                     
+	s_load_dword s[stemp2], s[stemp2:stemp2+1], 0x0                     
+	s_load_dword s[stemp2+1], s[stemp2+2:stemp2+3], 0x0                     
+	s_waitcnt lgkmcnt(0)                                
+	v_mov_b32 v[vtmp1+1], s[stemp1]                               
+	v_mov_b32 v[v_db], s[stemp2]                               
+  // LDS memory: lcl_scale = *(bnScale + grpid);
+	ds_write2_b32 v[vtmp1], v[v_db], v[vtmp1+1] offset0:1 offset1:2        
+	v_mov_b32 v[vtmp1+1], s[stemp2+1]                       
+	ds_write_b32 v[vtmp1], v[vtmp1+1]                                 
+skip_bnScale_update:
+	s_or_b64 exec, exec, s[stmp+2:stmp+3]
+	s_waitcnt lgkmcnt(0)                                
+	s_barrier                                           
+	v_mov_b32 v[v_db], 0                                 
+	s_load_dwordx2 s[soffset_dx_out:soffset_dx_out+1], s[kernarg:kernarg+1], 0x0 + dx_out_ptr_off
+	s_load_dwordx2 s[soffset_dscale:soffset_dscale+1], s[kernarg:kernarg+1], 0x0 + dscale_ptr_off
+	s_load_dwordx2 s[soffset_dbias:soffset_dbias+1], s[kernarg:kernarg+1], 0x0 + dbias_ptr_off
+	s_load_dword s[soffset_inhw], s[kernarg:kernarg+1], 0x0 + inhw_off
+	ds_read2_b32 v[vtmp1:vtmp1+1], v[v_db] offset1:1                   
+ // compute channel id(cidx) = grpid * MIO_BN_HW 
+	s_movk_i32 s[stmp+2], 0+MIO_BN_HW                                 
+	s_mul_i32 s[stemp3+1], s[stmp+6], s[stmp+2]                               
+	v_cmp_gt_u32 s[stmp+2:stmp+3], s[stmp+2], v[tid]                     
+	v_mov_b32 v[v_ds], 0                                 
+	s_and_saveexec_b64 s[stmp9:stmp10], s[stmp+2:stmp+3]                 
+	s_cbranch_execz skip_delta_update                               
+
+	_v_add_nc_u32 v[qtmp2], s[stmp8], v[tid]                           
+	v_mov_b32 v[v_db], 0                                 
+	v_mov_b32 v[qtmp2+1], 0                                 
+	v_mov_b32 v[v_ds], 0                                 
+compute_delta_values:
+	_v_add_nc_u32 v[qtmp2+2], v[qtmp2], v[qtmp2+1]                            
+	v_mov_b32 v[qtmp2+3], 0                                 
+	v_lshlrev_b64 v[qtmp3:qtmp3+1], 1, v[qtmp2+2:qtmp2+3]                    
+	v_mov_b32 v[qtmp3+3], s[soffset_dy_in+1]                              
+	_v_add_co_u32 v[qtmp3+2], s[stmp+4:stmp+5], s[soffset_dy_in], v[qtmp3]               
+	_v_add_nc_u32 v[qtmp2+2], 0+MIO_BN_CHW, v[qtmp2+2]                       
+	_v_add_co_ci_u32 v[qtmp3+3], s[stmp+4:stmp+5], v[qtmp3+3], v[qtmp3+1], s[stmp+4:stmp+5]     
+	v_mov_b32 v[qtmp4], s[soffset_in+1]                               
+	_v_add_co_u32 v[qtmp3], s[stmp+4:stmp+5], s[soffset_in], v[qtmp3]                 
+	v_lshlrev_b64 v[qtmp2+2:qtmp2+3], 1, v[qtmp2+2:qtmp2+3]                     
+	_v_add_co_ci_u32 v[qtmp3+1], s[stmp+4:stmp+5], v[qtmp4], v[qtmp3+1], s[stmp+4:stmp+5]     
+	v_mov_b32 v[qtmp4+1], s[soffset_dy_in+1]                              
+	_v_add_co_u32 v[qtmp4], s[stmp+4:stmp+5], s[soffset_dy_in], v[qtmp2+2]               
+	_v_add_co_ci_u32 v[qtmp4+1], s[stmp+4:stmp+5], v[qtmp4+1], v[qtmp2+3], s[stmp+4:stmp+5]      
+	v_mov_b32 v[qtmp4+2], s[soffset_in+1]                               
+	_v_add_co_u32 v[qtmp2+2], s[stmp+4:stmp+5], s[soffset_in], v[qtmp2+2]                 
+	flat_load_ushort v[qtmp3+2], v[qtmp3+2:qtmp3+3]               
+	_v_add_co_ci_u32 v[qtmp2+3], s[stmp+4:stmp+5], v[qtmp4+2], v[qtmp2+3], s[stmp+4:stmp+5]       
+	flat_load_ushort v[qtmp3], v[qtmp3:qtmp3+1]               
+	flat_load_ushort v[qtmp3+1], v[qtmp4:qtmp4+1]               
+	flat_load_ushort v[qtmp2+2], v[qtmp2+2:qtmp2+3]                 
+	_v_add_nc_u32 v[qtmp2+1], 0+MIO_BN_CHW*2, v[qtmp2+1]                       
+	v_cmp_eq_u32 vcc, 0+MIO_BN_NCHW, v[qtmp2+1]                 
+	s_and_b64 vcc, exec, vcc                            
+	s_waitcnt vmcnt(3)                                  
+	v_cvt_f32_f16 v[qtmp2+3], v[qtmp3+2]                           
+	s_waitcnt vmcnt(2)                                  
+	v_cvt_f32_f16 v[qtmp3], v[qtmp3]                            
+	s_waitcnt vmcnt(1)                                  
+	v_cvt_f32_f16 v[qtmp3+3], v[qtmp3+1]                          
+	s_waitcnt vmcnt(0)                                  
+	v_cvt_f32_f16 v[qtmp2+2], v[qtmp2+2]                            
+	v_add_f32 v[v_db], v[v_db], v[qtmp2+3]                            
+	s_waitcnt lgkmcnt(0)                                
+	v_sub_f32 v[qtmp2+3], v[qtmp3], v[vtmp1+1]                            
+	v_mul_f32 v[qtmp2+3], v[vtmp1], v[qtmp2+3]                            
+	v_sub_f32 v[qtmp2+2], v[qtmp2+2], v[vtmp1+1]                            
+        .if(fmamix_instructions_available)
+	    v_fma_mix_f32 v[v_ds], v[qtmp2+3], v[qtmp3+2], v[v_ds] op_sel_hi:[0,1,0]     
+        .else
+            v_cvt_f32_f16 v[qtmp3+2], v[qtmp3+2]   
+	    v_fma_f32 v[v_ds], v[qtmp2+3], v[qtmp3+2], v[v_ds] 
+        .endif
+	v_mul_f32 v[qtmp2+2], v[vtmp1], v[qtmp2+2]                            
+	v_add_f32 v[v_db], v[v_db], v[qtmp3+3]                           
+        .if(fmamix_instructions_available)
+	    v_fma_mix_f32 v[v_ds], v[qtmp2+2], v[qtmp3+1], v[v_ds] op_sel_hi:[0,1,0]     
+        .else
+            v_cvt_f32_f16 v[qtmp3+1], v[qtmp3+1]   
+	    v_fma_f32 v[v_ds], v[qtmp2+2], v[qtmp3+1], v[v_ds] 
+        .endif
+	s_cbranch_vccz compute_delta_values                                
+skip_delta_update:
+	s_or_b64 exec, exec, s[stmp9:stmp10]
+	s_waitcnt lgkmcnt(0)                                
+	s_barrier                                           
+ // DPP interleaved reduction...          
+	v_and_b32 v[qtmp2], 63, v[tid]                            
+	v_cmp_eq_u32 vcc, 63, v[qtmp2]                        
+	s_nop 4                                             
+	v_add_f32_dpp v[v_ds], v[v_ds], v[v_ds]  row_shr:1 bound_ctrl:0    
+	v_add_f32_dpp v[v_db], v[v_db], v[v_db]  row_shr:1 bound_ctrl:0    
+	s_nop 0                                             
+	v_add_f32_dpp v[v_ds], v[v_ds], v[v_ds]  row_shr:2 bound_ctrl:0    
+	v_add_f32_dpp v[v_db], v[v_db], v[v_db]  row_shr:2 bound_ctrl:0    
+	s_nop 0                                             
+	v_add_f32_dpp v[v_ds], v[v_ds], v[v_ds]  row_shr:4 bank_mask:0xe   
+	v_add_f32_dpp v[v_db], v[v_db], v[v_db]  row_shr:4 bank_mask:0xe   
+	s_nop 0                                             
+	v_add_f32_dpp v[v_ds], v[v_ds], v[v_ds]  row_shr:8 bank_mask:0xc   
+	v_add_f32_dpp v[v_db], v[v_db], v[v_db]  row_shr:8 bank_mask:0xc   
+	s_nop 0                                             
+	v_add_f32_dpp v[v_ds], v[v_ds], v[v_ds]  row_bcast:15 row_mask:0xa 
+	v_add_f32_dpp v[v_db], v[v_db], v[v_db]  row_bcast:15 row_mask:0xa 
+	s_nop 0                                             
+	v_add_f32_dpp v[v_ds], v[v_ds], v[v_ds]  row_bcast:31 row_mask:0xc 
+	v_add_f32_dpp v[v_db], v[v_db], v[v_db]  row_bcast:31 row_mask:0xc 
+	s_nop 1                                             
+	s_and_saveexec_b64 s[stmp+4:stmp+5], vcc                      
+	v_lshrrev_b32 v[qtmp2], 4, v[tid]                         
+	v_and_b32 v[qtmp2], 12, v[qtmp2]                            
+	ds_write2_b32 v[qtmp2], v[v_db], v[v_ds] offset0:3 offset1:0+MIO_BN_LDSGCN_SIZE+3        
+	s_or_b64 exec, exec, s[stmp+4:stmp+5]                         
+	s_waitcnt lgkmcnt(0)                                
+	s_barrier                                           
+	v_mov_b32 v[v_db], 0                                 
+	v_mov_b32 v[qtmp2], 0                                 
+	v_mov_b32 v[v_ds], 0                                 
+bn_ldsgcn_size_loop:
+	ds_read2_b32 v[qtmp2+1:qtmp2+2], v[qtmp2] offset0:3 offset1:0+MIO_BN_LDSGCN_SIZE+3         
+	_v_add_nc_u32 v[qtmp2], 4, v[qtmp2]                             
+	v_cmp_eq_u32 vcc, 0+MIO_BN_LDSGCN_SIZE*4, v[qtmp2]                        
+	s_and_b64 vcc, exec, vcc                            
+	s_waitcnt lgkmcnt(0)                                
+	v_add_f32 v[v_ds], v[v_ds], v[qtmp2+2]                            
+	v_add_f32 v[v_db], v[v_db], v[qtmp2+1]                            
+	s_cbranch_vccz bn_ldsgcn_size_loop                                
+	s_barrier                                           
+	s_and_saveexec_b64 s[stmp+4:stmp+5], s[stmp+2:stmp+3]                   
+	s_cbranch_execz skip_normalization                              
+
+        .GPR_REUSE tid, vtmp6
+
+	v_mov_b32 v[qtmp2], 0                                 
+	ds_read_b32 v[qtmp2+2], v[qtmp2] offset:8                         
+	_v_add_nc_u32 v[vtmp6], s[stmp8], v[vtmp6]                           
+	v_xor_b32 v[qtmp2+1], 0x80000000, v[v_db]                    
+	s_waitcnt lgkmcnt(0)                                
+	v_mul_f32 v[qtmp2+2], v[vtmp1], v[qtmp2+2]                            
+	v_mul_f32 v[qtmp2+2], s[soffset_inhw], v[qtmp2+2]                           
+	s_mov_b32 s[soffset_inhw], 0+MIO_BN_NHW_FLOAT                           
+apply_normalization:
+	_v_add_nc_u32 v[qtmp2+3], v[vtmp6], v[qtmp2]                            
+	v_mov_b32 v[qtmp3], 0                                 
+	v_lshlrev_b64 v[qtmp3+1:qtmp3+2], 1, v[qtmp2+3:qtmp3]                   
+	v_mov_b32 v[qtmp4], s[soffset_dy_in+1]                              
+	_v_add_co_u32 v[qtmp3+3], vcc, s[soffset_dy_in], v[qtmp3+1]                 
+	_v_add_nc_u32 v[qtmp2+3], 0+MIO_BN_CHW, v[qtmp2+3]                       
+	_v_add_co_ci_u32 v[qtmp4], vcc, v[qtmp4], v[qtmp3+2], vcc           
+	v_lshlrev_b64 v[qtmp2+3:qtmp3], 1, v[qtmp2+3:qtmp3]                     
+	v_mov_b32 v[qtmp4+2], s[soffset_in+1]                               
+	_v_add_co_u32 v[qtmp4+1], vcc, s[soffset_in], v[qtmp3+1]                  
+	_v_add_co_ci_u32 v[qtmp4+2], vcc, v[qtmp4+2], v[qtmp3+2], vcc           
+	v_mov_b32 v[qtmp5], s[soffset_dy_in+1]                              
+	_v_add_co_u32 v[qtmp4+3], vcc, s[soffset_dy_in], v[qtmp2+3]                  
+	_v_add_co_ci_u32 v[qtmp5], vcc, v[qtmp5], v[qtmp3], vcc            
+	_v_add_co_u32 v[qtmp5+1], vcc, s[soffset_in], v[qtmp2+3]                   
+	v_mov_b32 v[qtmp5+2], s[soffset_in+1]                               
+	flat_load_ushort v[qtmp3+3], v[qtmp3+3:qtmp4]               
+	_v_add_co_ci_u32 v[qtmp5+2], vcc, v[qtmp5+2], v[qtmp3], vcc            
+	flat_load_ushort v[qtmp4], v[qtmp4+1:qtmp4+2]               
+	flat_load_ushort v[qtmp4+1], v[qtmp4+3:qtmp5]               
+	flat_load_ushort v[qtmp4+2], v[qtmp5+1:qtmp5+2]               
+	v_mov_b32 v[qtmp5], s[soffset_dx_out+1]                              
+	_v_add_co_u32 v[qtmp2+3], s[stmp+2:stmp+3], s[soffset_dx_out], v[qtmp2+3]                
+	_v_add_co_ci_u32 v[qtmp3], s[stmp+2:stmp+3], v[qtmp5], v[qtmp3], s[stmp+2:stmp+3]       
+	_v_add_nc_u32 v[qtmp2], 0+MIO_BN_CHW*2, v[qtmp2]                       
+	v_cmp_eq_u32 vcc, 0+MIO_BN_NCHW, v[qtmp2]                 
+	v_mov_b32 v[qtmp4+3], s[soffset_dx_out+1]                              
+	_v_add_co_u32 v[qtmp3+1], s[stmp+2:stmp+3], s[soffset_dx_out], v[qtmp3+1]              
+	s_and_b64 vcc, exec, vcc                            
+	_v_add_co_ci_u32 v[qtmp3+2], s[stmp+2:stmp+3], v[qtmp4+3], v[qtmp3+2], s[stmp+2:stmp+3]     
+	s_waitcnt vmcnt(3)                                  
+        .if(fmamix_instructions_available)
+	    v_fma_mix_f32 v[qtmp3+3], v[qtmp3+3], s[soffset_inhw], v[qtmp2+1] op_sel_hi:[1,0,0]   
+        .else
+            v_cvt_f32_f16 v[qtmp3+3], v[qtmp3+3]      
+	    v_fma_f32 v[qtmp3+3], v[qtmp3+3], s[soffset_inhw], v[qtmp2+1]
+        .endif
+	s_waitcnt vmcnt(2)                                  
+	v_cvt_f32_f16 v[qtmp4], v[qtmp4]                          
+	s_waitcnt vmcnt(1)                                  
+        .if(fmamix_instructions_available)
+	    v_fma_mix_f32 v[qtmp4+1], v[qtmp4+1], s[soffset_inhw], v[qtmp2+1] op_sel_hi:[1,0,0]   
+        .else
+            v_cvt_f32_f16 v[qtmp4+1], v[qtmp4+1]      
+	    v_fma_f32 v[qtmp4+1], v[qtmp4+1], s[soffset_inhw], v[qtmp2+1]
+        .endif
+	s_waitcnt vmcnt(0)                                  
+	v_cvt_f32_f16 v[qtmp4+2], v[qtmp4+2]                          
+	v_sub_f32 v[qtmp4], v[qtmp4], v[vtmp1+1]                          
+	v_mul_f32 v[qtmp4], v[vtmp1], v[qtmp4]                          
+	v_sub_f32 v[qtmp4+2], v[qtmp4+2], v[vtmp1+1]                          
+	v_mul_f32 v[qtmp4], v[v_ds], v[qtmp4]                          
+	v_mul_f32 v[qtmp4+2], v[vtmp1], v[qtmp4+2]                          
+	v_sub_f32 v[qtmp3+3], v[qtmp3+3], v[qtmp4]                         
+	v_mul_f32 v[qtmp4], v[v_ds], v[qtmp4+2]                          
+	v_sub_f32 v[qtmp4], v[qtmp4+1], v[qtmp4]                         
+	v_mul_f32 v[qtmp3+3], v[qtmp2+2], v[qtmp3+3]                          
+	v_mul_f32 v[qtmp4], v[qtmp2+2], v[qtmp4]                          
+	v_cvt_f16_f32 v[qtmp3+3], v[qtmp3+3]                          
+	v_cvt_f16_f32 v[qtmp4], v[qtmp4]                          
+	flat_store_short v[qtmp3+1:qtmp3+2], v[qtmp3+3]               
+	flat_store_short v[qtmp2+3:qtmp3], v[qtmp4]                 
+	s_cbranch_vccz apply_normalization                               
+skip_normalization:
+	s_or_b64 exec, exec, s[stmp+4:stmp+5]                         
+	s_and_saveexec_b64 s[stmp+2:stmp+3], s[stmp:stmp+1]                   
+
+	s_lshl_b64 s[stmp:stmp+1], s[stmp+6:stmp+7], 2                        
+	s_add_u32 s[stmp+2], s[soffset_dbias], s[stmp]                               
+	s_addc_u32 s[stmp+3], s[soffset_dbias+1], s[stmp+1]                              
+	s_add_u32 s[stmp], s[soffset_dscale], s[stmp]                               
+	s_addc_u32 s[stmp+1], s[soffset_dscale+1], s[stmp+1]                              
+	v_mov_b32 v[qtmp2], s[stmp]                                
+	v_mov_b32 v[qtmp2+1], s[stmp+1]                                
+	v_mov_b32 v[qtmp3], s[stmp+2]                                
+	v_mov_b32 v[qtmp3+1], s[stmp+3]                                
+	flat_store_dword v[qtmp2:qtmp2+1], v[v_ds]                  
+	flat_store_dword v[qtmp3:qtmp3+1], v[v_db]                  
+
+	s_endpgm                                            
+
+
+
+.Lfunc_end0:
+    .size gcnAsmBNBwdTrainSpatial, .Lfunc_end0 - gcnAsmBNBwdTrainSpatial
+
+ROCM_METADATA_VERSION = 4
+
+.macro metadata wg_x, use_save_flag
+  .if ROCM_METADATA_VERSION == 4
+    .if (\use_save_flag == 0) 
+      .amd_amdgpu_hsa_metadata
+      { Version: [ 1, 0 ],
+           Kernels:
+           -  { Name: gcnAsmBNBwdTrainSpatial, SymbolName: 'gcnAsmBNBwdTrainSpatial@kd', Language: OpenCL C, LanguageVersion: [ 1, 2 ],
+               Attrs:
+                 { ReqdWorkGroupSize: [ \wg_x, 1, 1 ] }
+                 CodeProps:
+                 { KernargSegmentSize: 112, GroupSegmentFixedSize: 212, PrivateSegmentFixedSize: 132, KernargSegmentAlign: 8, WavefrontSize: 64, NumSGPRs: 32, NumVGPRs: 20, MaxFlatWorkGroupSize: 832}
+                 Args:
+                 - { Name: x_in    , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F16, TypeName: 'half*', AddrSpaceQual: Global, AccQual: ReadOnly, IsConst: true, IsRestrict: true}
+                 - { Name: dy_in   , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F16, TypeName: 'half*', AddrSpaceQual: Global, AccQual: Default, IsRestrict: true}
+                 - { Name: dx_out   , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F16, TypeName: 'half*', AddrSpaceQual: Global, AccQual: Default, IsRestrict: true}
+                 - { Name: bnScale   , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F32, TypeName: 'float*', AddrSpaceQual: Global, AccQual: Default, IsConst: true}
+                 - { Name: dscale    , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F32, TypeName: 'float*', AddrSpaceQual: Global, AccQual: Default, IsRestrict: true }
+                 - { Name: dbias    , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F32, TypeName: 'float*', AddrSpaceQual: Global, AccQual: Default, IsRestrict: true }
+                 - { Name: epsilon, Size: 8, Align: 8, ValueKind: ByValue, ValueType: F64, TypeName: 'double', AccQual: Default }
+                 - { Name: INHW    , Size: 4, Align: 4, ValueKind: ByValue, ValueType: F32, TypeName: 'float', AccQual: Default }
+                 //- { Name: HiddenGlobalOffsetX, Size: 8, Align: 8, ValueKind: ByValue, ValueType: I64 }
+                 //- { Name: HiddenGlobalOffsetY, Size: 8, Align: 8, ValueKind: ByValue, ValueType: I64 }
+                 //- { Name: HiddenGlobalOffsetZ, Size: 8, Align: 8, ValueKind: ByValue, ValueType: I64 }
+               }
+      }
+      .end_amd_amdgpu_hsa_metadata
+    .elseif (\use_save_flag == 1) 
+      .amd_amdgpu_hsa_metadata
+      { Version: [ 1, 0 ],
+           Kernels:
+           -  { Name: gcnAsmBNBwdTrainSpatial, SymbolName: 'gcnAsmBNBwdTrainSpatial@kd', Language: OpenCL C, LanguageVersion: [ 1, 2 ],
+               Attrs:
+                 { ReqdWorkGroupSize: [ \wg_x, 1, 1 ] }
+                 CodeProps:
+                 { KernargSegmentSize: 112, GroupSegmentFixedSize: 212, PrivateSegmentFixedSize: 132, KernargSegmentAlign: 8, WavefrontSize: 64, NumSGPRs: 32, NumVGPRs: 20, MaxFlatWorkGroupSize: 832}
+                 Args:
+                 - { Name: x_in    , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F16, TypeName: 'half*', AddrSpaceQual: Global, AccQual: ReadOnly, IsConst: true, IsRestrict: true}
+                 - { Name: dy_in   , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F16, TypeName: 'half*', AddrSpaceQual: Global, AccQual: Default, IsRestrict: true}
+                 - { Name: dx_out   , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F16, TypeName: 'half*', AddrSpaceQual: Global, AccQual: Default, IsRestrict: true}
+                 - { Name: bnScale   , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F32, TypeName: 'float*', AddrSpaceQual: Global, AccQual: Default, IsConst: true}
+                 - { Name: dscale    , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F32, TypeName: 'float*', AddrSpaceQual: Global, AccQual: Default, IsRestrict: true }
+                 - { Name: dbias    , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F32, TypeName: 'float*', AddrSpaceQual: Global, AccQual: Default, IsRestrict: true }
+                 - { Name: savedMean    , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F32, TypeName: 'float*', AddrSpaceQual: Global, AccQual: Default, IsConst: true }
+                 - { Name: savedInvVariance    , Size: 8, Align: 8, ValueKind: GlobalBuffer, ValueType: F32, TypeName: 'float*', AddrSpaceQual: Global, AccQual: Default, IsConst: true }
+                 - { Name: INHW    , Size: 4, Align: 4, ValueKind: ByValue, ValueType: F32, TypeName: 'float', AccQual: Default }
+                 //- { Name: HiddenGlobalOffsetX, Size: 8, Align: 8, ValueKind: ByValue, ValueType: I64 }
+                 //- { Name: HiddenGlobalOffsetY, Size: 8, Align: 8, ValueKind: ByValue, ValueType: I64 }
+                 //- { Name: HiddenGlobalOffsetZ, Size: 8, Align: 8, ValueKind: ByValue, ValueType: I64 }
+               }
+      }
+      .end_amd_amdgpu_hsa_metadata
+  .endif
+  .endif
+.endm
+
+
+.altmacro
+.macro metadata_wrapper x, y 
+    metadata %\x, %\y
+.endm
+ 
+metadata_wrapper MIO_BN_GRP0, MIO_BN_USESAVED
+
+
+              /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+
+#if MIOPEN_USE_FP16 == 1
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#define _FLOAT half
+#ifndef HALF_MAX
+#define MAX_VAL 65504 /* max value */
+#else
+#define MAX_VAL HALF_MAX
+#endif
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define _FLOAT float
+#ifndef FLT_MAX
+#define MAX_VAL 3.402823466e+38F /* max value */
+#else
+#define MAX_VAL FLT_MAX
+#endif
+#endif
+
+/* Only works for NCHW
+ * bitmap tracks which dims are the same between 'a' and 'c'.
+ * Example: 0, 1, 1, 0 means that C and H dims are the same and the rest are ones
+ * bitmap dims with 0 contribute to the work_per_wg,
+ * whereas dims with 1 contribute to the #workgroups (gid)
+ * work_per_wg = product of dims with 0s (dims of 'c tensor') and
+ * num_wg = product of dims with 1s (dims of 'a')
+ * Bitmap for fwd_bias looks like 0, 1, 0, 0
+ */
+
+#ifndef MIOPEN_TENSOR_OP
+#define MIOPEN_TENSOR_OP miopenMul
+#endif
+
+#define UNUSED __attribute__((__unused__))
+
+MIOPEN_TYPE miopenAdd(MIOPEN_TYPE a, MIOPEN_TYPE b) { return a + b; }
+
+MIOPEN_TYPE miopenMul(MIOPEN_TYPE a, MIOPEN_TYPE b) { return a * b; }
+
+MIOPEN_TYPE miopenMax(MIOPEN_TYPE a, MIOPEN_TYPE b) { return ((a > b) ? a : b); }
+
+MIOPEN_TYPE miopenMin(MIOPEN_TYPE a, MIOPEN_TYPE b) { return ((a < b) ? a : b); }
+
+MIOPEN_TYPE miopenExp(MIOPEN_TYPE a, MIOPEN_TYPE b) { return (exp(a + b)); }
+
+MIOPEN_TYPE miopenPow(MIOPEN_TYPE a, MIOPEN_TYPE b) { return (pow(a, b)); }
+
+MIOPEN_TYPE miopenLog(MIOPEN_TYPE a, MIOPEN_TYPE b) { return (log(a + b)); }
+
+MIOPEN_TYPE miopenRDiv(MIOPEN_TYPE a, MIOPEN_TYPE b) { return a / b; }
+
+#ifdef USE_FWD_BIAS
+
+__kernel void OpTensorFwdBias(global MIOPEN_TYPE* a,
+                              global MIOPEN_TYPE* b,
+#if INCR_WG == 0
+                              UNUSED
+#endif
+                              const int b_c,
+                              global MIOPEN_TYPE* c,
+#if INCR_WG == 1
+                              UNUSED
+#endif
+                              const int c_n,
+                              const int c_nstride,
+                              const int c_cstride,
+                              const int work_per_wg,
+                              const MIOPEN_TYPE alpha0,
+                              const MIOPEN_TYPE alpha1,
+                              const MIOPEN_TYPE beta,
+                              const long Aoffset,
+                              const long Boffset,
+                              const long Coffset,
+                              const int num_wg)
+{
+    global MIOPEN_TYPE* a_off = a + Aoffset;
+    global MIOPEN_TYPE* b_off = b + Boffset;
+    global MIOPEN_TYPE* c_off = c + Coffset;
+
+    int gid = get_group_id(0);
+
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; gid < num_wg; gid += MAX_NUM_WG)
+    {
+
+        int lid = get_local_id(0);
+
+#if INCR_WG == 1
+        int o_n             = gid / b_c;
+        int o_c             = gid % b_c;
+        MIOPEN_TYPE operand = b_off[o_c] * alpha1;
+
+        while(lid < work_per_wg)
+        {
+            int index    = o_n * c_nstride + o_c * c_cstride + lid;
+            c_off[index] = MIOPEN_TENSOR_OP(a_off[index] * alpha0, operand) + beta * c_off[index];
+            lid += get_local_size(0);
+        }
+
+// each workgroup computes N*H*W for each C (bias-term)
+// number of workgroups = c_c (b_c)
+#elif INCR_WG == 0
+        MIOPEN_TYPE operand = b_off[gid] * alpha1;
+        int work_off        = work_per_wg / c_n;
+
+        while(lid < work_per_wg)
+        {
+            int o_hw     = lid % work_off;
+            int o_n      = lid / work_off;
+            int index    = o_n * c_nstride + gid * c_cstride + o_hw;
+            c_off[index] = MIOPEN_TENSOR_OP(a_off[index] * alpha0, operand) + beta * c_off[index];
+
+            lid += get_local_size(0);
+        }
+#endif // INCR_WG
+    }
+}
+
+#endif
+
+#ifdef USE_FWD_BIAS_GENERIC
+
+__kernel void OpTensorFwdBiasGeneric(global MIOPEN_TYPE* a,
+                                     const int a_nstride,
+                                     const int a_cstride,
+                                     const int a_hstride,
+                                     global MIOPEN_TYPE* b,
+#if INCR_WG == 0
+                                     UNUSED
+#endif
+                                     const int b_c,
+                                     const int b_cstride,
+                                     global MIOPEN_TYPE* c,
+#if INCR_WG == 1
+                                     UNUSED
+#endif
+                                     const int c_n,
+                                     const int c_w,
+                                     const int c_nstride,
+                                     const int c_cstride,
+                                     const int c_hstride,
+                                     const MIOPEN_TYPE alpha0,
+                                     const MIOPEN_TYPE alpha1,
+                                     const MIOPEN_TYPE beta,
+                                     const int work_per_wg,
+                                     const long Aoffset,
+                                     const long Boffset,
+                                     const long Coffset,
+                                     const int num_wg)
+{
+    int gid = get_group_id(0);
+
+    global MIOPEN_TYPE* a_off = a + Aoffset;
+    global MIOPEN_TYPE* b_off = b + Boffset;
+    global MIOPEN_TYPE* c_off = c + Coffset;
+
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; gid < num_wg; gid += MAX_NUM_WG)
+    {
+        int lid = get_local_id(0);
+
+#if INCR_WG == 1
+
+        int o_c = gid % b_c;
+        int o_n = gid / b_c;
+
+        int bindex          = o_c * b_cstride;
+        MIOPEN_TYPE operand = b_off[bindex] * alpha1;
+
+        while(lid < work_per_wg)
+        {
+            int o_h    = lid / c_w;
+            int o_w    = lid % c_w;
+            int aindex = o_n * a_nstride + o_c * a_cstride + o_h * a_hstride + o_w;
+            int cindex = o_n * c_nstride + o_c * c_cstride + o_h * c_hstride + o_w;
+            c_off[cindex] =
+                MIOPEN_TENSOR_OP(a_off[aindex] * alpha0, operand) + beta * c_off[cindex];
+            lid += get_local_size(0);
+        }
+
+// each workgroup computes N*H*W for each C (bias-term)
+// number of workgroups = c_c (b_c)
+#elif INCR_WG == 0
+        MIOPEN_TYPE operand = b_off[gid * b_cstride] * alpha1;
+        // int work_off        = work_per_wg / c_n;
+
+        while(lid < work_per_wg)
+        {
+            int o_n    = lid % c_n;
+            int o_h    = (lid / c_n) / c_w;
+            int o_w    = (lid / c_n) % c_w;
+            int aindex = o_n * a_nstride + gid * a_cstride + o_h * a_hstride + o_w;
+            int cindex = o_n * c_nstride + gid * c_cstride + o_h * c_hstride + o_w;
+            c_off[cindex] =
+                MIOPEN_TENSOR_OP(a_off[aindex] * alpha0, operand) + beta * c_off[cindex];
+
+            lid += get_local_size(0);
+        }
+#endif // INCR_WG
+    }
+}
+
+#endif
+
+// DLOWELL : cutting out this section
+#ifdef USE_LEADING_ONES
+
+__kernel void OpTensorLeadingOnes(global MIOPEN_TYPE* a,
+                                  global MIOPEN_TYPE* b,
+                                  global MIOPEN_TYPE* c,
+#if FIRST_NOT_ONE == 0
+                                  UNUSED
+#endif
+                                  const int c_c,
+#if FIRST_NOT_ONE <= 1
+                                  UNUSED
+#endif
+                                  const int c_h,
+#if FIRST_NOT_ONE <= 1
+                                  UNUSED
+#endif
+                                  const int c_w,
+                                  const int c_nstride,
+#if FIRST_NOT_ONE == 0
+                                  UNUSED
+#endif
+                                  const int c_cstride,
+#if FIRST_NOT_ONE == 3
+                                  UNUSED
+#endif
+                                  const int work_per_wg,
+                                  const MIOPEN_TYPE alpha0,
+                                  const MIOPEN_TYPE alpha1,
+                                  const MIOPEN_TYPE beta,
+                                  const long Aoffset,
+                                  const long Boffset,
+                                  const long Coffset,
+                                  const int num_wg)
+{
+
+    /* Special case for leading ones where the total no. of threads is the
+     * inner_product of the tensor dims.  Each thread just updates one value
+     */
+
+    global MIOPEN_TYPE* a_off = a + Aoffset;
+    global MIOPEN_TYPE* b_off = b + Boffset;
+    global MIOPEN_TYPE* c_off = c + Coffset;
+
+#if FIRST_NOT_ONE == 3 // bitmap = 1,1,1,1
+
+    int tid = get_global_id(0);
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; tid < num_wg; tid += MAX_NUM_WG)
+    {
+
+        MIOPEN_TYPE operand = b_off[tid] * alpha1;
+
+        int o_w = tid % c_w;
+        int o_h = (tid / c_w) % c_h;
+        int o_c = (tid / (c_w * c_h)) % c_c;
+        int o_n = tid / (c_w * c_h * c_c);
+
+        int index    = o_n * c_nstride + o_c * c_cstride + o_h * c_w + o_w;
+        c_off[index] = MIOPEN_TENSOR_OP(a_off[index] * alpha0, operand) + beta * c_off[index];
+    }
+#elif FIRST_NOT_ONE == 2 // bitmap = 1,1,1,0
+    int gid = get_group_id(0);
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; gid < num_wg; gid += MAX_NUM_WG)
+    {
+
+        int lid             = get_local_id(0);
+        MIOPEN_TYPE operand = b_off[gid] * alpha1;
+
+        int o_h = gid % c_h;
+        int o_c = (gid / c_h) % c_c;
+        int o_n = gid / (c_c * c_h);
+
+        while(lid < work_per_wg)
+        {
+            int index    = o_n * c_nstride + o_c * c_cstride + o_h * c_w + lid;
+            c_off[index] = MIOPEN_TENSOR_OP(a_off[index] * alpha0, operand) + beta * c_off[index];
+            lid += get_local_size(0);
+        }
+    }
+#elif FIRST_NOT_ONE == 1 // bitmap = 1,1,0,0
+    int gid = get_group_id(0);
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; gid < num_wg; gid += MAX_NUM_WG)
+    {
+
+        int lid             = get_local_id(0);
+        MIOPEN_TYPE operand = b_off[gid] * alpha1;
+
+        int o_c = gid % c_c;
+        int o_n = gid / c_c;
+
+        while(lid < work_per_wg)
+        {
+            int index    = o_n * c_nstride + o_c * c_cstride + lid;
+            c_off[index] = MIOPEN_TENSOR_OP(a_off[index] * alpha0, operand) + beta * c_off[index];
+            lid += get_local_size(0);
+        }
+    }
+
+#elif FIRST_NOT_ONE == 0 // bitmap = 1,0,0,0
+    int gid = get_group_id(0);
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; gid < num_wg; gid += MAX_NUM_WG)
+    {
+        int lid             = get_local_id(0);
+        MIOPEN_TYPE operand = b_off[gid] * alpha1;
+
+        while(lid < work_per_wg)
+        {
+            int index    = gid * c_nstride + lid;
+            c_off[index] = MIOPEN_TENSOR_OP(a_off[index] * alpha0, operand) + beta * c_off[index];
+            lid += get_local_size(0);
+        }
+    }
+#endif
+}
+
+#endif
+
+// DLOWELL : cutting out this section
+#ifdef USE_LEADING_ONES_GENERIC
+
+__kernel void OpTensorLeadingOnesGeneric(global MIOPEN_TYPE* a,
+                                         const int a_nstride,
+                                         const int a_cstride,
+                                         const int a_hstride,
+                                         global MIOPEN_TYPE* b,
+                                         const int b_nstride,
+#if FIRST_NOT_ONE == 0
+                                         UNUSED
+#endif
+                                         const int b_cstride,
+#if FIRST_NOT_ONE <= 1
+                                         UNUSED
+#endif
+                                         const int b_hstride,
+                                         global MIOPEN_TYPE* c,
+                                         const int c_c,
+#if FIRST_NOT_ONE == 1
+                                         UNUSED
+#endif
+                                         const int c_h,
+#if FIRST_NOT_ONE == 0 || FIRST_NOT_ONE == 2
+                                         UNUSED
+#endif
+                                         const int c_w,
+                                         const int c_nstride,
+                                         const int c_cstride,
+                                         const int c_hstride,
+                                         const MIOPEN_TYPE alpha0,
+                                         const MIOPEN_TYPE alpha1,
+                                         const MIOPEN_TYPE beta,
+#if FIRST_NOT_ONE == 3
+                                         UNUSED
+#endif
+                                         const int work_per_wg,
+                                         const long Aoffset,
+                                         const long Boffset,
+                                         const long Coffset,
+                                         const int num_wg)
+{
+
+    /* Special case for leading ones where the total no. of threads is the
+     * inner_product of the tensor dims.  Each thread just updates one value
+     */
+    global MIOPEN_TYPE* a_off = a + Aoffset;
+    global MIOPEN_TYPE* b_off = b + Boffset;
+    global MIOPEN_TYPE* c_off = c + Coffset;
+#if FIRST_NOT_ONE == 3 // bitmap = 1,1,1,1
+    int tid = get_global_id(0);
+    // MIOPEN_TYPE operand = b[tid];
+
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; tid < num_wg; tid += MAX_NUM_WG)
+    {
+
+        int o_w = tid % c_w;
+        int o_h = (tid / c_w) % c_h;
+        int o_c = (tid / (c_w * c_h)) % c_c;
+        int o_n = tid / (c_w * c_h * c_c);
+
+        int aindex = o_n * a_nstride + o_c * a_cstride + o_h * a_hstride + o_w;
+        int bindex = o_n * b_nstride + o_c * b_cstride + o_h * b_hstride + o_w;
+        int cindex = o_n * c_nstride + o_c * c_cstride + o_h * c_hstride + o_w;
+        c_off[cindex] =
+            MIOPEN_TENSOR_OP(alpha0 * a_off[aindex], alpha1 * b_off[bindex]) + beta * c_off[cindex];
+    }
+
+#elif FIRST_NOT_ONE == 2 // bitmap = 1,1,1,0
+    int gid = get_group_id(0);
+
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; gid < num_wg; gid += MAX_NUM_WG)
+    {
+        int lid = get_local_id(0);
+        int o_h = gid % c_h;
+        int o_c = (gid / c_h) % c_c;
+        int o_n = gid / (c_c * c_h);
+
+        int bindex          = o_n * b_nstride + o_c * b_cstride + o_h * b_hstride;
+        MIOPEN_TYPE operand = b_off[bindex] * alpha1;
+
+        while(lid < work_per_wg)
+        {
+            int aindex = o_n * a_nstride + o_c * a_cstride + o_h * a_hstride + lid;
+            int cindex = o_n * c_nstride + o_c * c_cstride + o_h * c_hstride + lid;
+            c_off[cindex] =
+                MIOPEN_TENSOR_OP(alpha0 * a_off[aindex], operand) + beta * c_off[cindex];
+
+            lid += get_local_size(0);
+        }
+    }
+#elif FIRST_NOT_ONE == 1 // bitmap = 1,1,0,0
+    int gid = get_group_id(0);
+
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; gid < num_wg; gid += MAX_NUM_WG)
+    {
+        int lid = get_local_id(0);
+        int o_c = gid % c_c;
+        int o_n = gid / c_c;
+
+        int bindex          = o_n * b_nstride + o_c * b_cstride;
+        MIOPEN_TYPE operand = b_off[bindex] * alpha1;
+
+        while(lid < work_per_wg)
+        {
+            int o_h    = lid / c_w;
+            int o_w    = lid % c_w;
+            int aindex = o_n * a_nstride + o_c * a_cstride + o_h * a_hstride + o_w;
+            int cindex = o_n * c_nstride + o_c * c_cstride + o_h * c_hstride + o_w;
+            c_off[cindex] =
+                MIOPEN_TENSOR_OP(a_off[aindex] * alpha0, operand) + beta * c_off[cindex];
+            lid += get_local_size(0);
+        }
+    }
+
+#elif FIRST_NOT_ONE == 0 // bitmap = 1,0,0,0
+    int gid = get_group_id(0);
+
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; gid < num_wg; gid += MAX_NUM_WG)
+    {
+        int lid             = get_local_id(0);
+        MIOPEN_TYPE operand = b_off[gid * b_nstride] * alpha1;
+
+        while(lid < work_per_wg)
+        {
+            int o_c    = lid % c_c;
+            int o_h    = (lid / c_c) % c_h;
+            int o_w    = (lid / c_c) / c_h;
+            int aindex = gid * a_nstride + o_c * a_cstride + o_h * a_hstride + o_w;
+            int cindex = gid * c_nstride + o_c * c_cstride + o_h * c_hstride + o_w;
+            c_off[cindex] =
+                MIOPEN_TENSOR_OP(a_off[aindex] * alpha0, operand) + beta * c_off[cindex];
+
+            lid += get_local_size(0);
+        }
+    }
+#endif
+}
+
+#endif
+
+#ifdef USE_4D_TENSOR_GENERIC
+
+__kernel void Op4dTensorGeneric(global MIOPEN_TYPE* a,
+                                const int a_nstride,
+                                const int a_cstride,
+                                const int a_hstride,
+                                global MIOPEN_TYPE* b,
+                                const int b_c,
+                                const int b_h,
+                                const int b_w,
+                                const int b_nstride,
+                                const int b_cstride,
+                                const int b_hstride,
+                                global MIOPEN_TYPE* c,
+                                const int c_c,
+                                const int c_h,
+                                const int c_w,
+                                const int c_nstride,
+                                const int c_cstride,
+                                const int c_hstride,
+                                const MIOPEN_TYPE alpha0,
+                                const MIOPEN_TYPE alpha1,
+                                const MIOPEN_TYPE beta,
+                                const unsigned int bitmap,
+                                const int work_per_wg,
+                                const long Aoffset,
+                                const long Boffset,
+                                const long Coffset,
+                                const int num_wg)
+{
+    int gid = get_group_id(0);
+
+    global MIOPEN_TYPE* a_off = a + Aoffset;
+    global MIOPEN_TYPE* b_off = b + Boffset;
+    global MIOPEN_TYPE* c_off = c + Coffset;
+
+    // MIOPEN_TYPE operand = b[gid + Boffset];
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; gid < num_wg; gid += MAX_NUM_WG)
+    {
+        int lid = get_local_id(0);
+
+        int o_h_div = bitmap & (1 << 0) ? 1 : c_w;
+        int o_c_div = o_h_div * (bitmap & (1 << 1) ? 1 : c_h);
+        int o_n_div = o_c_div * (bitmap & (1 << 2) ? 1 : c_c);
+
+        int o_w_gid_off = gid % b_w;
+        int o_h_gid_off = (gid / b_w) % b_h;
+        int o_c_gid_off = (gid / b_w / b_h) % b_c;
+        int o_n_gid_off = (gid / b_w / b_h) / b_c;
+
+        int bindex = o_n_gid_off * b_nstride + o_c_gid_off * b_cstride + o_h_gid_off * b_hstride +
+                     o_w_gid_off;
+        MIOPEN_TYPE operand = b_off[bindex] * alpha1;
+
+        while(lid < work_per_wg)
+        {
+            int o_w = (bitmap & (1 << 0)) ? o_w_gid_off : lid % c_w;
+            int o_h = (bitmap & (1 << 1)) ? o_h_gid_off : (lid / o_h_div) % c_h;
+            int o_c = (bitmap & (1 << 2)) ? o_c_gid_off : (lid / o_c_div) % c_c;
+            int o_n = (bitmap & (1 << 3)) ? o_n_gid_off : lid / o_n_div;
+
+            int aindex = o_n * a_nstride + o_c * a_cstride + o_h * a_hstride + o_w;
+            int cindex = o_n * c_nstride + o_c * c_cstride + o_h * c_hstride + o_w;
+            c_off[cindex] =
+                MIOPEN_TENSOR_OP(a_off[aindex] * alpha0, operand) + beta * c_off[cindex];
+
+            lid += get_local_size(0);
+        }
+    }
+}
+
+#endif
+
+#ifdef USE_5D_TENSOR_GENERIC
+// NCDHW
+// (samples, color_depth, frames, width, height )
+__kernel void Op5dTensorGeneric(global MIOPEN_TYPE* a,
+                                const int a_nstride,
+                                const int a_cstride,
+                                const int a_dstride,
+                                const int a_hstride,
+                                global MIOPEN_TYPE* b,
+                                const int b_c,
+                                const int b_d,
+                                const int b_h,
+                                const int b_w,
+                                const int b_nstride,
+                                const int b_cstride,
+                                const int b_dstride,
+                                const int b_hstride,
+                                global MIOPEN_TYPE* c,
+                                const int c_c,
+                                const int c_d,
+                                const int c_h,
+                                const int c_w,
+                                const int c_nstride,
+                                const int c_cstride,
+                                const int c_dstride,
+                                const int c_hstride,
+                                const MIOPEN_TYPE alpha0,
+                                const MIOPEN_TYPE alpha1,
+                                const MIOPEN_TYPE beta,
+                                const unsigned int bitmap,
+                                const int work_per_wg,
+                                const long Aoffset,
+                                const long Boffset,
+                                const long Coffset,
+                                const int num_wg)
+{
+    int gid = get_group_id(0);
+
+    global MIOPEN_TYPE* a_off = a + Aoffset;
+    global MIOPEN_TYPE* b_off = b + Boffset;
+    global MIOPEN_TYPE* c_off = c + Coffset;
+
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; gid < num_wg; gid += MAX_NUM_WG)
+    {
+
+        int lid = get_local_id(0);
+
+        int o_h_div = bitmap & (1 << 0) ? 1 : c_w;
+        int o_d_div = o_h_div * (bitmap & (1 << 1) ? 1 : c_h);
+        int o_c_div = o_d_div * (bitmap & (1 << 2) ? 1 : c_d);
+        int o_n_div = o_c_div * (bitmap & (1 << 3) ? 1 : c_c);
+
+        int o_w_gid_off = gid % b_w;
+        int o_h_gid_off = (gid / b_w) % b_h;
+        int o_d_gid_off = (gid / b_w / b_h) % b_d;
+        int o_c_gid_off = (gid / b_w / b_h / b_d) % b_c;
+        int o_n_gid_off = (gid / b_w / b_h / b_d) / b_c;
+
+        int bindex = o_n_gid_off * b_nstride + o_c_gid_off * b_cstride + o_d_gid_off * b_dstride +
+                     o_h_gid_off * b_hstride + o_w_gid_off;
+
+        MIOPEN_TYPE operand = b_off[bindex] * alpha1;
+
+        while(lid < work_per_wg)
+        {
+            int o_w = (bitmap & (1 << 0)) ? o_w_gid_off : lid % c_w;
+            int o_h = (bitmap & (1 << 1)) ? o_h_gid_off : (lid / o_h_div) % c_h;
+            int o_d = (bitmap & (1 << 2)) ? o_d_gid_off : (lid / o_d_div) % c_d;
+            int o_c = (bitmap & (1 << 3)) ? o_c_gid_off : (lid / o_c_div) % c_c;
+            int o_n = (bitmap & (1 << 4)) ? o_n_gid_off : lid / o_n_div;
+
+            int aindex =
+                o_n * a_nstride + o_c * a_cstride + o_d * a_dstride + o_h * a_hstride + o_w;
+            int cindex =
+                o_n * c_nstride + o_c * c_cstride + o_d * c_dstride + o_h * c_hstride + o_w;
+
+            c_off[cindex] =
+                MIOPEN_TENSOR_OP(a_off[aindex] * alpha0, operand) + beta * c_off[cindex];
+
+            lid += get_local_size(0);
+        }
+    }
+}
+
+#endif
+
+#ifdef USE_3D_TENSOR_GENERIC
+// NCH
+__kernel void Op3dTensorGeneric(global MIOPEN_TYPE* a,
+                                const int a_nstride,
+                                const int a_cstride,
+                                global MIOPEN_TYPE* b,
+                                const int b_c,
+                                const int b_h,
+                                const int b_nstride,
+                                const int b_cstride,
+                                global MIOPEN_TYPE* c,
+                                const int c_c,
+                                const int c_h,
+                                const int c_nstride,
+                                const int c_cstride,
+                                const MIOPEN_TYPE alpha0,
+                                const MIOPEN_TYPE alpha1,
+                                const MIOPEN_TYPE beta,
+                                const unsigned int bitmap,
+                                const int work_per_wg,
+                                const long Aoffset,
+                                const long Boffset,
+                                const long Coffset,
+                                const int num_wg)
+{
+    int gid = get_group_id(0);
+
+    global MIOPEN_TYPE* a_off = a + Aoffset;
+    global MIOPEN_TYPE* b_off = b + Boffset;
+    global MIOPEN_TYPE* c_off = c + Coffset;
+
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; gid < num_wg; gid += MAX_NUM_WG)
+    {
+
+        int lid     = get_local_id(0);
+        int o_c_div = bitmap & (1 << 0) ? 1 : c_h;
+        int o_n_div = o_c_div * (bitmap & (1 << 1) ? 1 : c_c);
+
+        int o_h_gid_off = gid % b_h;
+        int o_c_gid_off = (gid / b_h) % b_c;
+        int o_n_gid_off = (gid / b_h) / b_c;
+
+        int bindex          = o_n_gid_off * b_nstride + o_c_gid_off * b_cstride + o_h_gid_off;
+        MIOPEN_TYPE operand = b_off[bindex] * alpha1;
+
+        while(lid < work_per_wg)
+        {
+            int o_h = (bitmap & (1 << 0)) ? o_h_gid_off : lid % c_h;
+            int o_c = (bitmap & (1 << 1)) ? o_c_gid_off : (lid / o_c_div) % c_c;
+            int o_n = (bitmap & (1 << 2)) ? o_n_gid_off : lid / o_n_div;
+
+            int aindex = o_n * a_nstride + o_c * a_cstride + o_h;
+            int cindex = o_n * c_nstride + o_c * c_cstride + o_h;
+
+            c_off[cindex] =
+                MIOPEN_TENSOR_OP(a_off[aindex] * alpha0, operand) + beta * c_off[cindex];
+
+            lid += get_local_size(0);
+        }
+    }
+}
+
+#endif
+
+#ifdef USE_2D_TENSOR_LITE
+__kernel void Op2dTensorLite(const global MIOPEN_TYPE* a,
+                             const int a_nstride,
+                             const global MIOPEN_TYPE* b,
+#ifdef BIAS
+                             UNUSED
+#endif
+                             const int b_nstride,
+                             global MIOPEN_TYPE* c,
+                             const int c_nstride,
+                             const MIOPEN_TYPE alpha0,
+                             const MIOPEN_TYPE alpha1,
+#ifndef BETA
+                             UNUSED
+#endif
+                             const MIOPEN_TYPE beta,
+                             const long Aoffset,
+                             const long Boffset,
+                             const long Coffset,
+                             const int num_wg)
+{
+    int gid0 = get_global_id(0);
+    int gid1 = get_global_id(1);
+
+    MIOPEN_TYPE a_dat[RD_BLCK];
+    MIOPEN_TYPE b_dat[RD_BLCK];
+    MIOPEN_TYPE c_dat[RD_BLCK];
+
+#ifdef BIAS
+    int b_index          = gid0 * RD_BLCK;
+    *((READ_TYPE*)b_dat) = *((const global READ_TYPE*)(b + Boffset + b_index));
+#endif
+
+    for(; gid1 < num_wg; gid1 += MAX_NUM_WG)
+    {
+        int a_index = gid1 * a_nstride + gid0 * RD_BLCK;
+        int c_index = gid1 * c_nstride + gid0 * RD_BLCK;
+
+        *((READ_TYPE*)a_dat) = *((const global READ_TYPE*)(a + Aoffset + a_index));
+#ifdef BETA
+        *((READ_TYPE*)c_dat) = *((const global READ_TYPE*)(c + Coffset + c_index));
+#endif
+
+#ifndef BIAS
+        int b_index          = gid1 * b_nstride + gid0 * RD_BLCK;
+        *((READ_TYPE*)b_dat) = *((const global READ_TYPE*)(b + Boffset + b_index));
+#endif
+
+        for(int i = 0; i < RD_BLCK; ++i)
+        {
+            c_dat[i] = MIOPEN_TENSOR_OP(a_dat[i] * alpha0, b_dat[i] * alpha1)
+#ifdef BETA
+                       + beta * c_dat[i]
+#endif
+                ;
+        }
+
+        *((global READ_TYPE*)(c + Coffset + c_index)) = *((READ_TYPE*)c_dat);
+    }
+}
+
+#endif
+
+#ifdef USE_2D_TENSOR_GENERIC
+// NC
+__kernel void Op2dTensorGeneric(global MIOPEN_TYPE* a,
+                                const int a_nstride,
+                                global MIOPEN_TYPE* b,
+                                const int b_c,
+                                const int b_nstride,
+                                global MIOPEN_TYPE* c,
+                                const int c_c,
+                                const int c_nstride,
+                                const MIOPEN_TYPE alpha0,
+                                const MIOPEN_TYPE alpha1,
+                                const MIOPEN_TYPE beta,
+                                const unsigned int bitmap,
+                                const int work_per_wg,
+                                const long Aoffset,
+                                const long Boffset,
+                                const long Coffset,
+                                const int num_wg)
+{
+    int gid = get_group_id(0);
+
+    global MIOPEN_TYPE* a_off = a + Aoffset;
+    global MIOPEN_TYPE* b_off = b + Boffset;
+    global MIOPEN_TYPE* c_off = c + Coffset;
+
+    int o_n_div = bitmap & (1 << 0) ? 1 : c_c;
+
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; gid < num_wg; gid += MAX_NUM_WG)
+    {
+
+        int lid         = get_local_id(0);
+        int o_c_gid_off = gid % b_c;
+        int o_n_gid_off = gid / b_c;
+
+        int bindex          = o_n_gid_off * b_nstride + o_c_gid_off;
+        MIOPEN_TYPE operand = b_off[bindex] * alpha1;
+
+        while(lid < work_per_wg)
+        {
+            int o_c    = (bitmap & (1 << 0)) ? o_c_gid_off : lid % c_c;
+            int o_n    = (bitmap & (1 << 1)) ? o_n_gid_off : lid / o_n_div;
+            int aindex = o_n * a_nstride + o_c;
+            int cindex = o_n * c_nstride + o_c;
+            c_off[cindex] =
+                MIOPEN_TENSOR_OP(a_off[aindex] * alpha0, operand) + beta * c_off[cindex];
+            lid += get_local_size(0);
+        }
+    }
+}
+
+#endif
+
+#ifdef USE_1D_TENSOR_GENERIC
+// N
+__kernel void Op1dTensorGeneric(global MIOPEN_TYPE* a,
+                                global MIOPEN_TYPE* b,
+                                const int b_n,
+                                global MIOPEN_TYPE* c,
+                                const int c_n,
+                                const MIOPEN_TYPE alpha0,
+                                const MIOPEN_TYPE alpha1,
+                                const MIOPEN_TYPE beta,
+                                const unsigned int bitmap,
+                                const int work_per_wg,
+                                const long Aoffset,
+                                const long Boffset,
+                                const long Coffset,
+                                const int num_wg)
+{
+    int gid = get_group_id(0);
+
+    global MIOPEN_TYPE* a_off = a + Aoffset;
+    global MIOPEN_TYPE* b_off = b + Boffset;
+    global MIOPEN_TYPE* c_off = c + Coffset;
+
+    // num_wg: the number of workgroups should be launched
+    // MAX_NUM_WG: the maximum number of workgroups actually launched
+    for(; gid < num_wg; gid += MAX_NUM_WG)
+    {
+        int lid             = get_local_id(0);
+        int o_n_gid_off     = gid % b_n;
+        int bindex          = o_n_gid_off;
+        MIOPEN_TYPE operand = b_off[bindex] * alpha1;
+        while(lid < work_per_wg)
+        {
+            int o_n    = (bitmap & (1 << 0)) ? o_n_gid_off : lid % c_n;
+            c_off[o_n] = MIOPEN_TENSOR_OP(a_off[o_n] * alpha0, operand) + beta * c_off[o_n];
+            lid += get_local_size(0);
+        }
+    }
+}
+
+#endif
+
+#ifdef USE_4D_TENSOR_LITE
+// N - batch size
+// C - # of maps
+// H - map height
+// W - map width
+// TENS_LEN = (N*C*H*W);
+// RD_BLCK = (TENS_LEN%4==0) ? 4 : (TENS_LEN%3==0)? 3 : (TENS_LEN%2==0)? 2 : 1;
+// READ_TYPE = (RD_BLCK==4) ? "float4" : (RD_BLCK == 3) ? "float3" : (RD_BLC==2) ? "float2" :
+// "float";
+// local size = (256, 1, 1)
+// global size = ((TENS_LEN/RD_BLCK), 1, 1)
+__kernel void Op4dTensorLite(const global MIOPEN_TYPE* a,
+                             const global MIOPEN_TYPE* b,
+                             global MIOPEN_TYPE* c,
+                             const MIOPEN_TYPE alpha0,
+                             const MIOPEN_TYPE alpha1,
+#ifndef BETA
+                             UNUSED
+#endif
+                             const MIOPEN_TYPE beta,
+                             const long Aoffset,
+                             const long Boffset,
+                             const long Coffset)
+{
+    int gid0 = get_global_id(0);
+
+    int index = gid0 * RD_BLCK;
+
+    MIOPEN_TYPE a_dat[RD_BLCK];
+    MIOPEN_TYPE b_dat[RD_BLCK];
+    MIOPEN_TYPE c_dat[RD_BLCK];
+
+    *((READ_TYPE*)a_dat) = *((const global READ_TYPE*)(a + index + Aoffset));
+    *((READ_TYPE*)b_dat) = *((const global READ_TYPE*)(b + index + Boffset));
+#ifdef BETA
+    *((READ_TYPE*)c_dat) = *((const global READ_TYPE*)(c + index + Coffset));
+#endif
+
+    for(int i = 0; i < RD_BLCK; ++i)
+    {
+        c_dat[i] = MIOPEN_TENSOR_OP(a_dat[i] * alpha0, b_dat[i] * alpha1)
+#ifdef BETA
+                   + beta * c_dat[i]
+#endif
+            ;
+    }
+
+    *((global READ_TYPE*)(c + index + Coffset)) = *((READ_TYPE*)c_dat);
+}
+
+#endif
+     /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+
+#define PPCAT_NX(A, B) A##B
+#define PPCAT(A, B) PPCAT_NX(A, B)
+#define TWO 2
+#define FOUR 4
+#define EIGHT 8
+
+#ifndef MIOPEN_USE_FP32
+#define MIOPEN_USE_FP32 0
+#endif
+
+#ifndef MIOPEN_USE_FP16
+#define MIOPEN_USE_FP16 0
+#endif
+
+#ifndef MIOPEN_USE_BFP16
+#define MIOPEN_USE_BFP16 0
+#endif
+
+#ifndef MIOPEN_USE_INT8
+#define MIOPEN_USE_INT8 0
+#endif
+
+#ifndef MIOPEN_USE_INT8x4
+#define MIOPEN_USE_INT8x4 0
+#endif
+
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+typedef union
+{
+    uint u32;
+    ushort2 ushortx2;
+    float f32;
+} cvt_bf16_fp32_t;
+
+float bfloat16_to_float(ushort src_val)
+{
+    cvt_bf16_fp32_t target_val;
+    target_val.ushortx2 = (ushort2)(0, src_val);
+    return target_val.f32;
+}
+
+ushort float_to_bfloat16(float src_val)
+{
+    cvt_bf16_fp32_t target_val;
+    target_val.f32 = src_val;
+    // BF16 round and NaN preservation code matches
+    // https://github.com/ROCmSoftwarePlatform/rocBLAS/blob/develop/library/include/rocblas_bfloat16.h
+    if((~target_val.u32 & 0x7f800000) == 0) // Inf or NaN
+    {
+        // When all of the exponent bits are 1, the value is Inf or NaN.
+        // Inf is indicated by a zero mantissa. NaN is indicated by any nonzero
+        // mantissa bit. Quiet NaN is indicated by the most significant mantissa
+        // bit being 1. Signaling NaN is indicated by the most significant
+        // mantissa bit being 0 but some other bit(s) being 1. If any of the
+        // lower 16 bits of the mantissa are 1, we set the least significant bit
+        // of the bfloat16 mantissa, in order to preserve signaling NaN in case
+        // the bloat16's mantissa bits are all 0.
+        if((target_val.u32 & 0xffff) != 0)
+        {
+            target_val.u32 |= 0x10000; // Preserve signaling NaN
+        }
+    }
+    else
+    {
+#ifdef MIOPEN_USE_RNE_BFLOAT16
+        // When the exponent bits are not all 1s, then the value is zero, normal,
+        // or subnormal. We round the bfloat16 mantissa up by adding 0x7FFF, plus
+        // 1 if the least significant bit of the bfloat16 mantissa is 1 (odd).
+        // This causes the bfloat16's mantissa to be incremented by 1 if the 16
+        // least significant bits of the float mantissa are greater than 0x8000,
+        // or if they are equal to 0x8000 and the least significant bit of the
+        // bfloat16 mantissa is 1 (odd). This causes it to be rounded to even when
+        // the lower 16 bits are exactly 0x8000. If the bfloat16 mantissa already
+        // has the value 0x7f, then incrementing it causes it to become 0x00 and
+        // the exponent is incremented by one, which is the next higher FP value
+        // to the unrounded bfloat16 value. When the bfloat16 value is subnormal
+        // with an exponent of 0x00 and a mantissa of 0x7F, it may be rounded up
+        // to a normal value with an exponent of 0x01 and a mantissa of 0x00.
+        // When the bfloat16 value has an exponent of 0xFE and a mantissa of 0x7F,
+        // incrementing it causes it to become an exponent of 0xFF and a mantissa
+        // of 0x00, which is Inf, the next higher value to the unrounded value.
+        target_val.u32 +=
+            (0x7fff + (target_val.ushortx2.hi & 1)); // Round to nearest, round to even
+#else                                                // Truncation rounding
+// do nothing
+#endif
+    }
+    return target_val.ushortx2.hi;
+}
+
+
+#define PPCAT_NX(A, B) A##B
+#define PPCAT(A, B) PPCAT_NX(A, B)
+#define TWO 2
+#define FOUR 4
+#define EIGHT 8
+
+#if MIOPEN_USE_FP16 == 1
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#define _FLOAT half
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 2 /* sizeof is unavailable for preprocessor */
+#ifndef HALF_MAX
+#define MAX_VAL 65504 /* max value */
+#else
+#define MAX_VAL HALF_MAX
+#endif
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define _FLOAT float
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 4 /* sizeof is unavailable for preprocessor */
+#ifndef FLT_MAX
+#define MAX_VAL 3.402823466e+38F /* max value */
+#else
+#define MAX_VAL FLT_MAX
+#endif
+#endif
+#if MIOPEN_USE_BFP16 == 1
+#define _FLOAT ushort
+#define _FLOAT_ACCUM float
+#define SIZEOF_FLOAT 2 /* sizeof is unavailable for preprocessor */
+#define MAX_VAL 0x7F7F /* max value */
+#endif
+
+#define _FLOAT2 PPCAT(_FLOAT, TWO)
+#define _FLOAT4 PPCAT(_FLOAT, FOUR)
+#define _FLOAT8 PPCAT(_FLOAT, EIGHT)
+
+#if MIOPEN_USE_FP16 == 1
+#define CVT_FLOAT2ACCUM(x) ((_FLOAT_ACCUM)(x))
+#define CVT_ACCUM2FLOAT(x) ((_FLOAT)(x))
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define CVT_FLOAT2ACCUM(x) ((_FLOAT_ACCUM)(x))
+#define CVT_ACCUM2FLOAT(x) ((_FLOAT)(x))
+#endif
+#if MIOPEN_USE_BFP16 == 1
+#define CVT_FLOAT2ACCUM(x) bfloat16_to_float(x)
+#define CVT_ACCUM2FLOAT(x) float_to_bfloat16(x)
+#endif
+
+
+#if MIOPEN_USE_INT8 == 1 || MIOPEN_USE_INT8x4 == 1
+#define _FLOAT char
+#ifndef FLT_MAX
+#define MAX_VAL 127 /* max value */
+#else
+#define MAX_VAL FLT_MAX
+#endif
+#endif
+
+#ifndef WORK_LENGTH_0
+#define WORK_LENGTH_0 1
+#endif
+
+#ifndef WORK_LENGTH_1
+#define WORK_LENGTH_1 1
+#endif
+
+#ifndef WORK_LENGTH_2
+#define WORK_LENGTH_2 1
+#endif
+
+#ifndef WORK_LENGTH_3
+#define WORK_LENGTH_3 1
+#endif
+
+#ifndef WORK_LENGTH_4
+#define WORK_LENGTH_4 1
+#endif
+
+#define WORK_STRIDE_4 1
+#define WORK_STRIDE_3 (WORK_LENGTH_4 * WORK_STRIDE_4)
+#define WORK_STRIDE_2 (WORK_LENGTH_3 * WORK_STRIDE_3)
+#define WORK_STRIDE_1 (WORK_LENGTH_2 * WORK_STRIDE_2)
+#define WORK_STRIDE_0 (WORK_LENGTH_1 * WORK_STRIDE_1)
+
+#ifndef SUBTENSOR_OP_WITH_SCALAR
+#define SUBTENSOR_OP_WITH_SCALAR BREAK_COMPILE_INTENTIONALLY
+#endif
+
+#define SUBTENSOR_OP_WITH_SCALAR_SET(t, a) (t = a)
+#define SUBTENSOR_OP_WITH_SCALAR_MULTIPLY(t, a) (t *= a)
+
+__kernel void SubTensorOpWithScalar1d(global _FLOAT* __restrict dst,
+                                      const _FLOAT alpha,
+                                      const int offset,
+                                      const int stride0,
+                                      const int len0)
+{
+    uint itmp = get_global_id(0);
+
+    const uint did0_begin = itmp / WORK_STRIDE_0;
+
+    for(uint did0 = did0_begin; did0 < len0; did0 += WORK_LENGTH_0)
+    {
+        const uint i = stride0 * did0;
+
+        SUBTENSOR_OP_WITH_SCALAR(dst[i + offset], alpha);
+    }
+}
+
+__kernel void SubTensorOpWithScalar2d(global _FLOAT* __restrict dst,
+                                      const _FLOAT alpha,
+                                      const int offset,
+                                      const int stride0,
+                                      const int stride1,
+                                      const int len0,
+                                      const int len1)
+{
+    uint itmp = get_global_id(0);
+
+    const uint did0_begin = itmp / WORK_STRIDE_0;
+
+    itmp -= did0_begin * WORK_STRIDE_0;
+
+    const uint did1_begin = itmp / WORK_STRIDE_1;
+
+    for(uint did0 = did0_begin; did0 < len0; did0 += WORK_LENGTH_0)
+    {
+        for(uint did1 = did1_begin; did1 < len1; did1 += WORK_LENGTH_1)
+        {
+            const uint i = stride0 * did0 + stride1 * did1;
+
+            SUBTENSOR_OP_WITH_SCALAR(dst[i + offset], alpha);
+        }
+    }
+}
+
+__kernel void SubTensorOpWithScalar3d(global _FLOAT* __restrict dst,
+                                      const _FLOAT alpha,
+                                      const int offset,
+                                      const int stride0,
+                                      const int stride1,
+                                      const int stride2,
+                                      const int len0,
+                                      const int len1,
+                                      const int len2)
+{
+    uint itmp = get_global_id(0);
+
+    const uint did0_begin = itmp / WORK_STRIDE_0;
+
+    itmp -= did0_begin * WORK_STRIDE_0;
+
+    const uint did1_begin = itmp / WORK_STRIDE_1;
+
+    itmp -= did1_begin * WORK_STRIDE_1;
+
+    const uint did2_begin = itmp / WORK_STRIDE_2;
+
+    for(uint did0 = did0_begin; did0 < len0; did0 += WORK_LENGTH_0)
+    {
+        for(uint did1 = did1_begin; did1 < len1; did1 += WORK_LENGTH_1)
+        {
+            for(uint did2 = did2_begin; did2 < len2; did2 += WORK_LENGTH_2)
+            {
+                const uint i = stride0 * did0 + stride1 * did1 + stride2 * did2;
+
+                SUBTENSOR_OP_WITH_SCALAR(dst[i + offset], alpha);
+            }
+        }
+    }
+}
+
+__kernel void SubTensorOpWithScalar4d(global _FLOAT* __restrict dst,
+                                      const _FLOAT alpha,
+                                      const int offset,
+                                      const int stride0,
+                                      const int stride1,
+                                      const int stride2,
+                                      const int stride3,
+                                      const int len0,
+                                      const int len1,
+                                      const int len2,
+                                      const int len3)
+{
+    uint itmp = get_global_id(0);
+
+    const uint did0_begin = itmp / WORK_STRIDE_0;
+
+    itmp -= did0_begin * WORK_STRIDE_0;
+
+    const uint did1_begin = itmp / WORK_STRIDE_1;
+
+    itmp -= did1_begin * WORK_STRIDE_1;
+
+    const uint did2_begin = itmp / WORK_STRIDE_2;
+
+    itmp -= did2_begin * WORK_STRIDE_2;
+
+    const uint did3_begin = itmp / WORK_STRIDE_3;
+
+    for(uint did0 = did0_begin; did0 < len0; did0 += WORK_LENGTH_0)
+    {
+        for(uint did1 = did1_begin; did1 < len1; did1 += WORK_LENGTH_1)
+        {
+            for(uint did2 = did2_begin; did2 < len2; did2 += WORK_LENGTH_2)
+            {
+                for(uint did3 = did3_begin; did3 < len3; did3 += WORK_LENGTH_3)
+                {
+                    const uint i =
+                        stride0 * did0 + stride1 * did1 + stride2 * did2 + stride3 * did3;
+
+                    SUBTENSOR_OP_WITH_SCALAR(dst[i + offset], alpha);
+                }
+            }
+        }
+    }
+}
+
+__kernel void SubTensorOpWithScalar5d(global _FLOAT* __restrict dst,
+                                      const _FLOAT alpha,
+                                      const int offset,
+                                      const int stride0,
+                                      const int stride1,
+                                      const int stride2,
+                                      const int stride3,
+                                      const int stride4,
+                                      const int len0,
+                                      const int len1,
+                                      const int len2,
+                                      const int len3,
+                                      const int len4)
+{
+    uint itmp = get_global_id(0);
+
+    const uint did0_begin = itmp / WORK_STRIDE_0;
+
+    itmp -= did0_begin * WORK_STRIDE_0;
+
+    const uint did1_begin = itmp / WORK_STRIDE_1;
+
+    itmp -= did1_begin * WORK_STRIDE_1;
+
+    const uint did2_begin = itmp / WORK_STRIDE_2;
+
+    itmp -= did2_begin * WORK_STRIDE_2;
+
+    const uint did3_begin = itmp / WORK_STRIDE_3;
+
+    itmp -= did3_begin * WORK_STRIDE_3;
+
+    const uint did4_begin = itmp / WORK_STRIDE_4;
+
+    for(uint did0 = did0_begin; did0 < len0; did0 += WORK_LENGTH_0)
+    {
+        for(uint did1 = did1_begin; did1 < len1; did1 += WORK_LENGTH_1)
+        {
+            for(uint did2 = did2_begin; did2 < len2; did2 += WORK_LENGTH_2)
+            {
+                for(uint did3 = did3_begin; did3 < len3; did3 += WORK_LENGTH_3)
+                {
+                    for(uint did4 = did4_begin; did4 < len4; did4 += WORK_LENGTH_4)
+                    {
+                        const uint i = stride0 * did0 + stride1 * did1 + stride2 * did2 +
+                                       stride3 * did3 + stride4 * did4;
+
+                        SUBTENSOR_OP_WITH_SCALAR(dst[i + offset], alpha);
+                    }
+                }
+            }
+        }
+    }
+}
+          /*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
+
+#define PPCAT_NX(A, B) A##B
+#define PPCAT(A, B) PPCAT_NX(A, B)
+#define TWO 2
+#define FOUR 4
+#define EIGHT 8
+
+#ifndef MIOPEN_USE_FP32
+#define MIOPEN_USE_FP32 0
+#endif
+
+#ifndef MIOPEN_USE_FP16
+#define MIOPEN_USE_FP16 0
+#endif
+
+#ifndef MIOPEN_USE_BFP16
+#define MIOPEN_USE_BFP16 0
+#endif
+
+#ifndef MIOPEN_USE_INT8
+#define MIOPEN_USE_INT8 0
+#endif
+
+#ifndef MIOPEN_USE_INT8x4
+#define MIOPEN_USE_INT8x4 0
+#endif
+
+#if MIOPEN_USE_INT8 == 1 || MIOPEN_USE_INT8x4 == 1
+#define _FLOAT char
+#ifndef FLT_MAX
+#define MAX_VAL 127 /* max value */
+#else
+#define MAX_VAL FLT_MAX
+#endif
+#endif
+#if MIOPEN_USE_FP16 == 1
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#define _FLOAT half
+#ifndef HALF_MAX
+#define MAX_VAL 65504 /* max value */
+#else
+#define MAX_VAL HALF_MAX
+#endif
+#endif
+#if MIOPEN_USE_BFP16 == 1
+#define _FLOAT ushort
+#define MAX_VAL 0x7F7F /* max value */
+#endif
+#if MIOPEN_USE_FP32 == 1
+#define _FLOAT float
+#ifndef FLT_MAX
+#define MAX_VAL 3.402823466e+38F /* max value */
+#else
+#define MAX_VAL FLT_MAX
+#endif
+#endif
+
+#define _FLOAT2 PPCAT(_FLOAT, TWO)
+#define _FLOAT4 PPCAT(_FLOAT, FOUR)
+#define _FLOAT8 PPCAT(_FLOAT, EIGHT)
+#define _AS_FLOAT PPCAT(as_, _FLOAT)
+
+#ifndef WORK_LENGTH_0
+#define WORK_LENGTH_0 1
+#endif
+
+#ifndef WORK_LENGTH_1
+#define WORK_LENGTH_1 1
+#endif
+
+#ifndef WORK_LENGTH_2
+#define WORK_LENGTH_2 1
+#endif
+
+#ifndef WORK_LENGTH_3
+#define WORK_LENGTH_3 1
+#endif
+
+#ifndef WORK_LENGTH_4
+#define WORK_LENGTH_4 1
+#endif
+
+#define WORK_STRIDE_4 1
+#define WORK_STRIDE_3 (WORK_LENGTH_4 * WORK_STRIDE_4)
+#define WORK_STRIDE_2 (WORK_LENGTH_3 * WORK_STRIDE_3)
+#define WORK_STRIDE_1 (WORK_LENGTH_2 * WORK_STRIDE_2)
+#define WORK_STRIDE_0 (WORK_LENGTH_1 * WORK_STRIDE_1)
+
+#ifndef SUBTENSOR_OP_WITH_SUBTENSOR
+#define SUBTENSOR_OP_WITH_SUBTENSOR BREAK_COMPILE_INTENTIONALLY
+#endif
+
+#define SUBTENSOR_OP_WITH_SUBTENSOR_COPY(dst, src) (dst = src)
+
+__kernel void SubTensorOpWithSubTensor1d(const global _FLOAT* __restrict src,
+                                         const int srcOffset,
+                                         const int srcStride0,
+                                         const int srcLen0,
+                                         global _FLOAT* __restrict dst,
+                                         const int dstOffset,
+                                         const int dstStride0)
+{
+    uint itmp = get_global_id(0);
+
+    const uint did0_begin = itmp / WORK_STRIDE_0;
+
+    for(uint did0 = did0_begin; did0 < srcLen0; did0 += WORK_LENGTH_0)
+    {
+        const uint sindex = srcStride0 * did0;
+        const uint dindex = dstStride0 * did0;
+
+        SUBTENSOR_OP_WITH_SUBTENSOR(dst[dindex + dstOffset], src[sindex + srcOffset]);
+    }
+}
+
+__kernel void SubTensorOpWithSubTensor2d(const global _FLOAT* __restrict src,
+                                         const int srcOffset,
+                                         const int srcStride0,
+                                         const int srcStride1,
+                                         const int srcLen0,
+                                         const int srcLen1,
+                                         global _FLOAT* __restrict dst,
+                                         const int dstOffset,
+                                         const int dstStride0,
+                                         const int dstStride1)
+{
+    uint itmp = get_global_id(0);
+
+    const uint did0_begin = itmp / WORK_STRIDE_0;
+
+    itmp -= did0_begin * WORK_STRIDE_0;
+
+    const uint did1_begin = itmp / WORK_STRIDE_1;
+
+    for(uint did0 = did0_begin; did0 < srcLen0; did0 += WORK_LENGTH_0)
+    {
+        for(uint did1 = did1_begin; did1 < srcLen1; did1 += WORK_LENGTH_1)
+        {
+            const uint sindex = srcStride0 * did0 + srcStride1 * did1;
+            const uint dindex = dstStride0 * did0 + dstStride1 * did1;
+
+            SUBTENSOR_OP_WITH_SUBTENSOR(dst[dindex + dstOffset], src[sindex + srcOffset]);
+        }
+    }
+}
+
+__kernel void SubTensorOpWithSubTensor3d(const global _FLOAT* __restrict src,
+                                         const int srcOffset,
+                                         const int srcStride0,
+                                         const int srcStride1,
+                                         const int srcStride2,
+                                         const int srcLen0,
+                                         const int srcLen1,
+                                         const int srcLen2,
+                                         global _FLOAT* __restrict dst,
+                                         const int dstOffset,
+                                         const int dstStride0,
+                                         const int dstStride1,
+                                         const int dstStride2)
+{
+    uint itmp = get_global_id(0);
+
+    const uint did0_begin = itmp / WORK_STRIDE_0;
+
+    itmp -= did0_begin * WORK_STRIDE_0;
+
+    const uint did1_begin = itmp / WORK_STRIDE_1;
+
+    itmp -= did1_begin * WORK_STRIDE_1;
+
+    const uint did2_begin = itmp / WORK_STRIDE_2;
+
+    for(uint did0 = did0_begin; did0 < srcLen0; did0 += WORK_LENGTH_0)
+    {
+        for(uint did1 = did1_begin; did1 < srcLen1; did1 += WORK_LENGTH_1)
+        {
+            for(uint did2 = did2_begin; did2 < srcLen2; did2 += WORK_LENGTH_2)
+            {
+                const uint sindex = srcStride0 * did0 + srcStride1 * did1 + srcStride2 * did2;
+                const uint dindex = dstStride0 * did0 + dstStride1 * did1 + dstStride2 * did2;
+
+                SUBTENSOR_OP_WITH_SUBTENSOR(dst[dindex + dstOffset], src[sindex + srcOffset]);
+            }
+        }
+    }
+}
+
+__kernel void SubTensorOpWithSubTensor4d(const global _FLOAT* __restrict src,
+                                         const int srcOffset,
+                                         const int srcStride0,
+                                         const int srcStride1,
+                                         const int srcStride2,
+                                         const int srcStride3,
+                 

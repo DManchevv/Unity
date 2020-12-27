@@ -1,0 +1,832 @@
+596,"na":"Timer: lol-patch.check-patch-timeout","sm":13,"dm":13},
+{"t":"se1","ts":12079498178,"ji":266644,"ty":0},
+{"t":"se1","ts":12079498196,"ji":266644,"di":25,"ty":1},
+{"t":"se1","ts":12079498432,"ji":266645,"ty":0},
+{"t":"se1","ts":12079498469,"ji":266645,"di":17,"ty":1},
+{"t":"se1","ts":12079498582,"ji":266644,"ty":6},
+{"t":"se1","ts":12079498647,"ji":266646,"ty":0},
+{"t":"se1","ts":12079498685,"ji":266596,"di":15,"ty":1},
+{"t":"se1","ts":12079498692,"ji":266647,"ty":0},
+{"t":"se1","ts":12079498694,"ji":266645,"ty":6},
+{"t":"se1","ts":12079498695,"ji":266596,"ty":6},
+{"t":"se1","ts":12079498696,"ji":266646,"di":15,"ty":1},
+{"t":"se1","ts":12079498737,"ji":266646,"ty":6},
+{"t":"ns1","ts":12079598948,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12079599245,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12079599406,"sd":1,"dd":11},
+{"t":"sd1","ji":266649,"pi":263917,"na":"Timer: lol-lobby.parties-gameflow","sm":61,"dm":61},
+{"t":"sd1","ji":266650,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266651,"pi":266650,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266653,"pi":266651,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12079580100,"ji":263917,"di":10,"ty":1},
+{"t":"se1","ts":12079580212,"ji":266649,"ty":0},
+{"t":"se1","ts":12079580220,"ji":263917,"ty":6},
+{"t":"se1","ts":12079598830,"ji":266650,"ty":0},
+{"t":"se1","ts":12079598896,"ji":266650,"di":21,"ty":1},
+{"t":"se1","ts":12079599115,"ji":266651,"ty":0},
+{"t":"se1","ts":12079599164,"ji":266651,"di":11,"ty":1},
+{"t":"se1","ts":12079599231,"ji":266650,"ty":6},
+{"t":"se1","ts":12079599324,"ji":266653,"ty":0},
+{"t":"se1","ts":12079599365,"ji":266653,"di":1,"ty":1},
+{"t":"se1","ts":12079599402,"ji":266653,"ty":6},
+{"t":"se1","ts":12079599425,"ji":266651,"ty":6},
+{"t":"ns1","ts":12079700185,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12079700472,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266655,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266656,"pi":266655,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266657,"pi":266656,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12079700090,"ji":266655,"ty":0},
+{"t":"se1","ts":12079700133,"ji":266655,"di":5,"ty":1},
+{"t":"se1","ts":12079700353,"ji":266656,"ty":0},
+{"t":"se1","ts":12079700391,"ji":266656,"di":8,"ty":1},
+{"t":"se1","ts":12079700511,"ji":266655,"ty":6},
+{"t":"se1","ts":12079700554,"ji":266657,"ty":0},
+{"t":"se1","ts":12079700581,"ji":266657,"di":4,"ty":1},
+{"t":"se1","ts":12079700602,"ji":266656,"ty":6},
+{"t":"se1","ts":12079700626,"ji":266657,"ty":6},
+{"t":"ns1","ts":12079804784,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12079805088,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12079805235,"sd":28,"dd":24},
+{"t":"sd1","ji":266661,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266662,"pi":266661,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266663,"pi":266662,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12079804689,"ji":266661,"ty":0},
+{"t":"se1","ts":12079804729,"ji":266661,"di":18,"ty":1},
+{"t":"se1","ts":12079804959,"ji":266662,"ty":0},
+{"t":"se1","ts":12079805004,"ji":266662,"di":24,"ty":1},
+{"t":"se1","ts":12079805094,"ji":266661,"ty":6},
+{"t":"se1","ts":12079805166,"ji":266663,"ty":0},
+{"t":"se1","ts":12079805179,"ji":266663,"di":28,"ty":1},
+{"t":"se1","ts":12079805229,"ji":266663,"ty":6},
+{"t":"se1","ts":12079805311,"ji":266662,"ty":6},
+{"t":"ns1","ts":12079946472,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12079946759,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266669,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266670,"pi":266669,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266671,"pi":266670,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12079946368,"ji":266669,"ty":0},
+{"t":"se1","ts":12079946418,"ji":266669,"di":20,"ty":1},
+{"t":"se1","ts":12079946641,"ji":266670,"ty":0},
+{"t":"se1","ts":12079946678,"ji":266670,"di":14,"ty":1},
+{"t":"se1","ts":12079946794,"ji":266669,"ty":6},
+{"t":"se1","ts":12079946841,"ji":266671,"ty":0},
+{"t":"se1","ts":12079946880,"ji":266671,"di":13,"ty":1},
+{"t":"se1","ts":12079946888,"ji":266670,"ty":6},
+{"t":"se1","ts":12079946927,"ji":266671,"ty":6},
+{"t":"ns1","ts":12080046476,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12080046739,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266674,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266675,"pi":266674,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266676,"pi":266675,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12080046385,"ji":266674,"ty":0},
+{"t":"se1","ts":12080046424,"ji":266674,"di":2,"ty":1},
+{"t":"se1","ts":12080046647,"ji":266675,"ty":0},
+{"t":"se1","ts":12080046657,"ji":266675,"di":19,"ty":1},
+{"t":"se1","ts":12080046802,"ji":266674,"ty":6},
+{"t":"se1","ts":12080046877,"ji":266676,"ty":0},
+{"t":"se1","ts":12080046916,"ji":266676,"di":5,"ty":1},
+{"t":"se1","ts":12080046935,"ji":266675,"ty":6},
+{"t":"se1","ts":12080046963,"ji":266676,"ty":6},
+{"t":"ns1","ts":12080150586,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12080150874,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12080151102,"sd":22,"dd":9},
+{"t":"sd1","ji":266678,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266679,"pi":266678,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266680,"pi":266679,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12080150487,"ji":266678,"ty":0},
+{"t":"se1","ts":12080150532,"ji":266678,"di":27,"ty":1},
+{"t":"se1","ts":12080150756,"ji":266679,"ty":0},
+{"t":"se1","ts":12080150795,"ji":266679,"di":9,"ty":1},
+{"t":"se1","ts":12080150838,"ji":266678,"ty":6},
+{"t":"se1","ts":12080151042,"ji":266680,"ty":0},
+{"t":"se1","ts":12080151052,"ji":266680,"di":22,"ty":1},
+{"t":"se1","ts":12080151097,"ji":266680,"ty":6},
+{"t":"se1","ts":12080151160,"ji":266679,"ty":6},
+{"t":"ns1","ts":12080250763,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12080251027,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266683,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266684,"pi":266683,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266685,"pi":266684,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12080250663,"ji":266683,"ty":0},
+{"t":"se1","ts":12080250707,"ji":266683,"di":25,"ty":1},
+{"t":"se1","ts":12080250934,"ji":266684,"ty":0},
+{"t":"se1","ts":12080250945,"ji":266684,"di":17,"ty":1},
+{"t":"se1","ts":12080251084,"ji":266683,"ty":6},
+{"t":"se1","ts":12080251103,"ji":266685,"ty":0},
+{"t":"se1","ts":12080251142,"ji":266685,"di":16,"ty":1},
+{"t":"se1","ts":12080251158,"ji":266684,"ty":6},
+{"t":"se1","ts":12080251191,"ji":266685,"ty":6},
+{"t":"ns1","ts":12080360263,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12080360538,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12080360699,"sd":6,"dd":11},
+{"t":"sd1","ji":266689,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266690,"pi":266689,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266691,"pi":266690,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12080360185,"ji":266689,"ty":0},
+{"t":"se1","ts":12080360204,"ji":266689,"di":1,"ty":1},
+{"t":"se1","ts":12080360441,"ji":266690,"ty":0},
+{"t":"se1","ts":12080360451,"ji":266690,"di":11,"ty":1},
+{"t":"se1","ts":12080360596,"ji":266689,"ty":6},
+{"t":"se1","ts":12080360644,"ji":266691,"ty":0},
+{"t":"se1","ts":12080360654,"ji":266691,"di":6,"ty":1},
+{"t":"se1","ts":12080360694,"ji":266691,"ty":6},
+{"t":"se1","ts":12080360705,"ji":266690,"ty":6},
+{"t":"ns1","ts":12080483467,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12080483756,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12080483924,"sd":23,"dd":7},
+{"t":"sd1","ji":266694,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266695,"pi":266694,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266696,"pi":266695,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12080483372,"ji":266694,"ty":0},
+{"t":"se1","ts":12080483415,"ji":266694,"di":4,"ty":1},
+{"t":"se1","ts":12080483633,"ji":266695,"ty":0},
+{"t":"se1","ts":12080483674,"ji":266695,"di":7,"ty":1},
+{"t":"se1","ts":12080483796,"ji":266694,"ty":6},
+{"t":"se1","ts":12080483838,"ji":266696,"ty":0},
+{"t":"se1","ts":12080483850,"ji":266696,"di":23,"ty":1},
+{"t":"se1","ts":12080483918,"ji":266696,"ty":6},
+{"t":"se1","ts":12080483976,"ji":266695,"ty":6},
+{"t":"ns1","ts":12080587615,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12080587922,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266697,"pi":266647,"na":"Timer: lol-patch.check-patch-timeout","sm":13,"dm":13},
+{"t":"sd1","ji":266699,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266700,"pi":266699,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266702,"pi":266700,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12080527871,"ji":266647,"di":22,"ty":1},
+{"t":"se1","ts":12080527901,"ji":266697,"ty":0},
+{"t":"se1","ts":12080527911,"ji":266647,"ty":6},
+{"t":"se1","ts":12080587510,"ji":266699,"ty":0},
+{"t":"se1","ts":12080587557,"ji":266699,"di":18,"ty":1},
+{"t":"se1","ts":12080587812,"ji":266700,"ty":0},
+{"t":"se1","ts":12080587826,"ji":266700,"di":28,"ty":1},
+{"t":"se1","ts":12080587992,"ji":266699,"ty":6},
+{"t":"se1","ts":12080588016,"ji":266702,"ty":0},
+{"t":"se1","ts":12080588028,"ji":266702,"di":24,"ty":1},
+{"t":"se1","ts":12080588077,"ji":266700,"ty":6},
+{"t":"se1","ts":12080588079,"ji":266702,"ty":6},
+{"t":"ns1","ts":12080691398,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12080691688,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266704,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266705,"pi":266704,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266706,"pi":266705,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12080691299,"ji":266704,"ty":0},
+{"t":"se1","ts":12080691344,"ji":266704,"di":14,"ty":1},
+{"t":"se1","ts":12080691572,"ji":266705,"ty":0},
+{"t":"se1","ts":12080691609,"ji":266705,"di":13,"ty":1},
+{"t":"se1","ts":12080691722,"ji":266704,"ty":6},
+{"t":"se1","ts":12080691762,"ji":266706,"ty":0},
+{"t":"se1","ts":12080691807,"ji":266706,"di":10,"ty":1},
+{"t":"se1","ts":12080691818,"ji":266705,"ty":6},
+{"t":"se1","ts":12080691856,"ji":266706,"ty":6},
+{"t":"ns1","ts":12080800975,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12080801269,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266710,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266711,"pi":266710,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266712,"pi":266711,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12080800877,"ji":266710,"ty":0},
+{"t":"se1","ts":12080800923,"ji":266710,"di":2,"ty":1},
+{"t":"se1","ts":12080801149,"ji":266711,"ty":0},
+{"t":"se1","ts":12080801188,"ji":266711,"di":19,"ty":1},
+{"t":"se1","ts":12080801305,"ji":266710,"ty":6},
+{"t":"se1","ts":12080801346,"ji":266712,"ty":0},
+{"t":"se1","ts":12080801355,"ji":266712,"di":8,"ty":1},
+{"t":"se1","ts":12080801401,"ji":266712,"ty":6},
+{"t":"se1","ts":12080801403,"ji":266711,"ty":6},
+{"t":"ns1","ts":12080901620,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12080901908,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12080902071,"sd":18,"dd":9},
+{"t":"sd1","ji":266717,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266718,"pi":266717,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266719,"pi":266718,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12080901557,"ji":266717,"ty":0},
+{"t":"se1","ts":12080901569,"ji":266717,"di":22,"ty":1},
+{"t":"se1","ts":12080901785,"ji":266718,"ty":0},
+{"t":"se1","ts":12080901823,"ji":266718,"di":9,"ty":1},
+{"t":"se1","ts":12080901912,"ji":266717,"ty":6},
+{"t":"se1","ts":12080901987,"ji":266719,"ty":0},
+{"t":"se1","ts":12080902019,"ji":266719,"di":18,"ty":1},
+{"t":"se1","ts":12080902066,"ji":266719,"ty":6},
+{"t":"se1","ts":12080902096,"ji":266718,"ty":6},
+{"t":"ns1","ts":12081033270,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12081033537,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266722,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266723,"pi":266722,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266724,"pi":266723,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12081033173,"ji":266722,"ty":0},
+{"t":"se1","ts":12081033216,"ji":266722,"di":20,"ty":1},
+{"t":"se1","ts":12081033441,"ji":266723,"ty":0},
+{"t":"se1","ts":12081033453,"ji":266723,"di":16,"ty":1},
+{"t":"se1","ts":12081033530,"ji":266722,"ty":6},
+{"t":"se1","ts":12081033670,"ji":266724,"ty":0},
+{"t":"se1","ts":12081033682,"ji":266724,"di":15,"ty":1},
+{"t":"se1","ts":12081033727,"ji":266724,"ty":6},
+{"t":"se1","ts":12081033727,"ji":266723,"ty":6},
+{"t":"ns1","ts":12081148681,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12081148971,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12081149138,"sd":2,"dd":3},
+{"t":"sd1","ji":266727,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266728,"pi":266727,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266729,"pi":266728,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12081148613,"ji":266727,"ty":0},
+{"t":"se1","ts":12081148627,"ji":266727,"di":11,"ty":1},
+{"t":"se1","ts":12081148849,"ji":266728,"ty":0},
+{"t":"se1","ts":12081148888,"ji":266728,"di":3,"ty":1},
+{"t":"se1","ts":12081148978,"ji":266727,"ty":6},
+{"t":"se1","ts":12081149047,"ji":266729,"ty":0},
+{"t":"se1","ts":12081149087,"ji":266729,"di":2,"ty":1},
+{"t":"se1","ts":12081149133,"ji":266729,"ty":6},
+{"t":"se1","ts":12081149170,"ji":266728,"ty":6},
+{"t":"ns1","ts":12081252811,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12081253098,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12081253262,"sd":12,"dd":7},
+{"t":"sd1","ji":266731,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266732,"pi":266731,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266734,"pi":266732,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12081252716,"ji":266731,"ty":0},
+{"t":"se1","ts":12081252758,"ji":266731,"di":23,"ty":1},
+{"t":"se1","ts":12081252977,"ji":266732,"ty":0},
+{"t":"se1","ts":12081253016,"ji":266732,"di":7,"ty":1},
+{"t":"se1","ts":12081253103,"ji":266731,"ty":6},
+{"t":"se1","ts":12081253182,"ji":266734,"ty":0},
+{"t":"se1","ts":12081253195,"ji":266734,"di":12,"ty":1},
+{"t":"se1","ts":12081253257,"ji":266734,"ty":6},
+{"t":"se1","ts":12081253318,"ji":266732,"ty":6},
+{"t":"ns1","ts":12081353469,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12081354115,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266737,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266738,"pi":266737,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266739,"pi":266738,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12081353375,"ji":266737,"ty":0},
+{"t":"se1","ts":12081353416,"ji":266737,"di":28,"ty":1},
+{"t":"se1","ts":12081353835,"ji":266738,"ty":0},
+{"t":"se1","ts":12081354000,"ji":266737,"ty":6},
+{"t":"se1","ts":12081354004,"ji":266738,"di":28,"ty":1},
+{"t":"se1","ts":12081354225,"ji":266739,"ty":0},
+{"t":"se1","ts":12081354446,"ji":266738,"ty":6},
+{"t":"se1","ts":12081354463,"ji":266739,"di":28,"ty":1},
+{"t":"se1","ts":12081354513,"ji":266739,"ty":6},
+{"t":"ns1","ts":12081462316,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12081462613,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266742,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266743,"pi":266742,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266744,"pi":266743,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12081462215,"ji":266742,"ty":0},
+{"t":"se1","ts":12081462263,"ji":266742,"di":13,"ty":1},
+{"t":"se1","ts":12081462481,"ji":266743,"ty":0},
+{"t":"se1","ts":12081462529,"ji":266743,"di":21,"ty":1},
+{"t":"se1","ts":12081462633,"ji":266742,"ty":6},
+{"t":"se1","ts":12081462695,"ji":266744,"ty":0},
+{"t":"se1","ts":12081462707,"ji":266744,"di":10,"ty":1},
+{"t":"se1","ts":12081462742,"ji":266743,"ty":6},
+{"t":"se1","ts":12081462756,"ji":266744,"ty":6},
+{"t":"ns1","ts":12081573461,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12081573847,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266745,"pi":266697,"na":"Timer: lol-patch.check-patch-timeout","sm":13,"dm":13},
+{"t":"sd1","ji":266748,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266749,"pi":266748,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266750,"pi":266749,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12081506450,"ji":266697,"di":2,"ty":1},
+{"t":"se1","ts":12081506473,"ji":266745,"ty":0},
+{"t":"se1","ts":12081506484,"ji":266697,"ty":6},
+{"t":"se1","ts":12081573353,"ji":266748,"ty":0},
+{"t":"se1","ts":12081573400,"ji":266748,"di":4,"ty":1},
+{"t":"se1","ts":12081573735,"ji":266749,"ty":0},
+{"t":"se1","ts":12081573763,"ji":266749,"di":5,"ty":1},
+{"t":"se1","ts":12081573874,"ji":266748,"ty":6},
+{"t":"se1","ts":12081573970,"ji":266750,"ty":0},
+{"t":"se1","ts":12081574024,"ji":266749,"ty":6},
+{"t":"se1","ts":12081574037,"ji":266750,"di":5,"ty":1},
+{"t":"se1","ts":12081574066,"ji":266750,"ty":6},
+{"t":"ns1","ts":12081675647,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12081675934,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266752,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266753,"pi":266752,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266754,"pi":266753,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12081675546,"ji":266752,"ty":0},
+{"t":"se1","ts":12081675593,"ji":266752,"di":18,"ty":1},
+{"t":"se1","ts":12081675817,"ji":266753,"ty":0},
+{"t":"se1","ts":12081675852,"ji":266753,"di":9,"ty":1},
+{"t":"se1","ts":12081675975,"ji":266752,"ty":6},
+{"t":"se1","ts":12081676020,"ji":266754,"ty":0},
+{"t":"se1","ts":12081676059,"ji":266754,"di":26,"ty":1},
+{"t":"se1","ts":12081676066,"ji":266753,"ty":6},
+{"t":"se1","ts":12081676101,"ji":266754,"ty":6},
+{"t":"ns1","ts":12081775670,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12081775962,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266758,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266759,"pi":266758,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266760,"pi":266759,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12081775569,"ji":266758,"ty":0},
+{"t":"se1","ts":12081775617,"ji":266758,"di":16,"ty":1},
+{"t":"se1","ts":12081775843,"ji":266759,"ty":0},
+{"t":"se1","ts":12081775881,"ji":266759,"di":15,"ty":1},
+{"t":"se1","ts":12081775997,"ji":266758,"ty":6},
+{"t":"se1","ts":12081776036,"ji":266760,"ty":0},
+{"t":"se1","ts":12081776074,"ji":266760,"di":14,"ty":1},
+{"t":"se1","ts":12081776088,"ji":266759,"ty":6},
+{"t":"se1","ts":12081776120,"ji":266760,"ty":6},
+{"t":"ns1","ts":12081876053,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12081876344,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266765,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266766,"pi":266765,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266767,"pi":266766,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12081875948,"ji":266765,"ty":0},
+{"t":"se1","ts":12081875995,"ji":266765,"di":2,"ty":1},
+{"t":"se1","ts":12081876239,"ji":266766,"ty":0},
+{"t":"se1","ts":12081876264,"ji":266766,"di":3,"ty":1},
+{"t":"se1","ts":12081876322,"ji":266765,"ty":6},
+{"t":"se1","ts":12081876470,"ji":266767,"ty":0},
+{"t":"se1","ts":12081876510,"ji":266767,"di":8,"ty":1},
+{"t":"se1","ts":12081876516,"ji":266766,"ty":6},
+{"t":"se1","ts":12081876557,"ji":266767,"ty":6},
+{"t":"ns1","ts":12081976565,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12081976857,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12081977109,"sd":22,"dd":27},
+{"t":"sd1","ji":266769,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266770,"pi":266769,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266771,"pi":266770,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12081976462,"ji":266769,"ty":0},
+{"t":"se1","ts":12081976511,"ji":266769,"di":7,"ty":1},
+{"t":"se1","ts":12081976737,"ji":266770,"ty":0},
+{"t":"se1","ts":12081976776,"ji":266770,"di":27,"ty":1},
+{"t":"se1","ts":12081976818,"ji":266769,"ty":6},
+{"t":"se1","ts":12081977014,"ji":266771,"ty":0},
+{"t":"se1","ts":12081977050,"ji":266771,"di":22,"ty":1},
+{"t":"se1","ts":12081977104,"ji":266771,"ty":6},
+{"t":"se1","ts":12081977203,"ji":266770,"ty":6},
+{"t":"ns1","ts":12082085954,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12082086246,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266774,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266775,"pi":266774,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266776,"pi":266775,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12082085882,"ji":266774,"ty":0},
+{"t":"se1","ts":12082085895,"ji":266774,"di":28,"ty":1},
+{"t":"se1","ts":12082086129,"ji":266775,"ty":0},
+{"t":"se1","ts":12082086167,"ji":266775,"di":25,"ty":1},
+{"t":"se1","ts":12082086279,"ji":266774,"ty":6},
+{"t":"se1","ts":12082086321,"ji":266776,"ty":0},
+{"t":"se1","ts":12082086335,"ji":266776,"di":20,"ty":1},
+{"t":"se1","ts":12082086374,"ji":266775,"ty":6},
+{"t":"se1","ts":12082086381,"ji":266776,"ty":6},
+{"t":"ns1","ts":12082188697,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12082189138,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12082189300,"sd":6,"dd":10},
+{"t":"sd1","ji":266779,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266780,"pi":266779,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266781,"pi":266780,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12082188597,"ji":266779,"ty":0},
+{"t":"se1","ts":12082188642,"ji":266779,"di":1,"ty":1},
+{"t":"se1","ts":12082188902,"ji":266780,"ty":0},
+{"t":"se1","ts":12082188917,"ji":266780,"di":10,"ty":1},
+{"t":"se1","ts":12082189168,"ji":266779,"ty":6},
+{"t":"se1","ts":12082189231,"ji":266781,"ty":0},
+{"t":"se1","ts":12082189241,"ji":266781,"di":6,"ty":1},
+{"t":"se1","ts":12082189287,"ji":266781,"ty":6},
+{"t":"se1","ts":12082189357,"ji":266780,"ty":6},
+{"t":"ns1","ts":12082289164,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12082289866,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12082290092,"sd":23,"dd":8},
+{"t":"sd1","ji":266783,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266784,"pi":266783,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266786,"pi":266784,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12082289005,"ji":266783,"ty":0},
+{"t":"se1","ts":12082289102,"ji":266783,"di":8,"ty":1},
+{"t":"se1","ts":12082289595,"ji":266784,"ty":0},
+{"t":"se1","ts":12082289728,"ji":266783,"ty":6},
+{"t":"se1","ts":12082289734,"ji":266784,"di":8,"ty":1},
+{"t":"se1","ts":12082289995,"ji":266786,"ty":0},
+{"t":"se1","ts":12082290036,"ji":266786,"di":23,"ty":1},
+{"t":"se1","ts":12082290086,"ji":266786,"ty":6},
+{"t":"se1","ts":12082290147,"ji":266784,"ty":6},
+{"t":"ns1","ts":12082397079,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12082397365,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266789,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266790,"pi":266789,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266791,"pi":266790,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12082397013,"ji":266789,"ty":0},
+{"t":"se1","ts":12082397026,"ji":266789,"di":18,"ty":1},
+{"t":"se1","ts":12082397248,"ji":266790,"ty":0},
+{"t":"se1","ts":12082397285,"ji":266790,"di":24,"ty":1},
+{"t":"se1","ts":12082397360,"ji":266789,"ty":6},
+{"t":"se1","ts":12082397444,"ji":266791,"ty":0},
+{"t":"se1","ts":12082397488,"ji":266791,"di":9,"ty":1},
+{"t":"se1","ts":12082397534,"ji":266791,"ty":6},
+{"t":"se1","ts":12082397537,"ji":266790,"ty":6},
+{"t":"ns1","ts":12082497124,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12082497410,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266794,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266795,"pi":266794,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266796,"pi":266795,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"sd1","ji":266797,"pi":266745,"na":"Timer: lol-patch.check-patch-timeout","sm":13,"dm":13},
+{"t":"se1","ts":12082497028,"ji":266794,"ty":0},
+{"t":"se1","ts":12082497072,"ji":266794,"di":15,"ty":1},
+{"t":"se1","ts":12082497292,"ji":266795,"ty":0},
+{"t":"se1","ts":12082497329,"ji":266795,"di":16,"ty":1},
+{"t":"se1","ts":12082497438,"ji":266794,"ty":6},
+{"t":"se1","ts":12082497485,"ji":266796,"ty":0},
+{"t":"se1","ts":12082497529,"ji":266796,"di":14,"ty":1},
+{"t":"se1","ts":12082497533,"ji":266795,"ty":6},
+{"t":"se1","ts":12082497574,"ji":266796,"ty":6},
+{"t":"se1","ts":12082511157,"ji":266745,"di":1,"ty":1},
+{"t":"se1","ts":12082511172,"ji":266797,"ty":0},
+{"t":"se1","ts":12082511177,"ji":266745,"ty":6},
+{"t":"ns1","ts":12082598578,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12082598860,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266799,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266800,"pi":266799,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266802,"pi":266800,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12082598479,"ji":266799,"ty":0},
+{"t":"se1","ts":12082598525,"ji":266799,"di":11,"ty":1},
+{"t":"se1","ts":12082598741,"ji":266800,"ty":0},
+{"t":"se1","ts":12082598779,"ji":266800,"di":2,"ty":1},
+{"t":"se1","ts":12082598897,"ji":266799,"ty":6},
+{"t":"se1","ts":12082598969,"ji":266802,"ty":0},
+{"t":"se1","ts":12082598980,"ji":266802,"di":3,"ty":1},
+{"t":"se1","ts":12082599023,"ji":266800,"ty":6},
+{"t":"se1","ts":12082599035,"ji":266802,"ty":6},
+{"t":"ns1","ts":12082713948,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12082714214,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266804,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266805,"pi":266804,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266806,"pi":266805,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12082713848,"ji":266804,"ty":0},
+{"t":"se1","ts":12082713895,"ji":266804,"di":7,"ty":1},
+{"t":"se1","ts":12082714117,"ji":266805,"ty":0},
+{"t":"se1","ts":12082714129,"ji":266805,"di":22,"ty":1},
+{"t":"se1","ts":12082714275,"ji":266804,"ty":6},
+{"t":"se1","ts":12082714301,"ji":266806,"ty":0},
+{"t":"se1","ts":12082714343,"ji":266806,"di":27,"ty":1},
+{"t":"se1","ts":12082714361,"ji":266805,"ty":6},
+{"t":"se1","ts":12082714389,"ji":266806,"ty":6},
+{"t":"ns1","ts":12082819466,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12082819733,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266811,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266812,"pi":266811,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266814,"pi":266812,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12082819401,"ji":266811,"ty":0},
+{"t":"se1","ts":12082819414,"ji":266811,"di":25,"ty":1},
+{"t":"se1","ts":12082819635,"ji":266812,"ty":0},
+{"t":"se1","ts":12082819651,"ji":266812,"di":20,"ty":1},
+{"t":"se1","ts":12082819740,"ji":266811,"ty":6},
+{"t":"se1","ts":12082819869,"ji":266814,"ty":0},
+{"t":"se1","ts":12082819880,"ji":266814,"di":15,"ty":1},
+{"t":"se1","ts":12082819925,"ji":266812,"ty":6},
+{"t":"se1","ts":12082819925,"ji":266814,"ty":6},
+{"t":"ns1","ts":12082920367,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12082920664,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12082920816,"sd":11,"dd":10},
+{"t":"sd1","ji":266817,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266818,"pi":266817,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266819,"pi":266818,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12082920264,"ji":266817,"ty":0},
+{"t":"se1","ts":12082920305,"ji":266817,"di":6,"ty":1},
+{"t":"se1","ts":12082920555,"ji":266818,"ty":0},
+{"t":"se1","ts":12082920570,"ji":266818,"di":10,"ty":1},
+{"t":"se1","ts":12082920659,"ji":266817,"ty":6},
+{"t":"se1","ts":12082920752,"ji":266819,"ty":0},
+{"t":"se1","ts":12082920763,"ji":266819,"di":11,"ty":1},
+{"t":"se1","ts":12082920812,"ji":266819,"ty":6},
+{"t":"se1","ts":12082920857,"ji":266818,"ty":6},
+{"t":"ns1","ts":12083023658,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12083023946,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12083024185,"sd":12,"dd":8},
+{"t":"sd1","ji":266821,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266822,"pi":266821,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266824,"pi":266822,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12083023564,"ji":266821,"ty":0},
+{"t":"se1","ts":12083023605,"ji":266821,"di":23,"ty":1},
+{"t":"se1","ts":12083023829,"ji":266822,"ty":0},
+{"t":"se1","ts":12083023865,"ji":266822,"di":8,"ty":1},
+{"t":"se1","ts":12083023912,"ji":266821,"ty":6},
+{"t":"se1","ts":12083024098,"ji":266824,"ty":0},
+{"t":"se1","ts":12083024136,"ji":266824,"di":12,"ty":1},
+{"t":"se1","ts":12083024180,"ji":266824,"ty":6},
+{"t":"se1","ts":12083024268,"ji":266822,"ty":6},
+{"t":"ns1","ts":12083132819,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12083133107,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266826,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266827,"pi":266826,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266828,"pi":266827,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12083132715,"ji":266826,"ty":0},
+{"t":"se1","ts":12083132763,"ji":266826,"di":9,"ty":1},
+{"t":"se1","ts":12083132988,"ji":266827,"ty":0},
+{"t":"se1","ts":12083133026,"ji":266827,"di":17,"ty":1},
+{"t":"se1","ts":12083133141,"ji":266826,"ty":6},
+{"t":"se1","ts":12083133190,"ji":266828,"ty":0},
+{"t":"se1","ts":12083133201,"ji":266828,"di":24,"ty":1},
+{"t":"se1","ts":12083133236,"ji":266827,"ty":6},
+{"t":"se1","ts":12083133246,"ji":266828,"ty":6},
+{"t":"ns1","ts":12083235620,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12083235905,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266831,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266832,"pi":266831,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266833,"pi":266832,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12083235517,"ji":266831,"ty":0},
+{"t":"se1","ts":12083235568,"ji":266831,"di":15,"ty":1},
+{"t":"se1","ts":12083235786,"ji":266832,"ty":0},
+{"t":"se1","ts":12083235825,"ji":266832,"di":16,"ty":1},
+{"t":"se1","ts":12083235930,"ji":266831,"ty":6},
+{"t":"se1","ts":12083235981,"ji":266833,"ty":0},
+{"t":"se1","ts":12083236016,"ji":266833,"di":14,"ty":1},
+{"t":"se1","ts":12083236032,"ji":266832,"ty":6},
+{"t":"se1","ts":12083236064,"ji":266833,"ty":6},
+{"t":"ns1","ts":12083336984,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12083337461,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12083337665,"sd":5,"dd":3},
+{"t":"sd1","ji":266837,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266838,"pi":266837,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266839,"pi":266838,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12083336766,"ji":266837,"ty":0},
+{"t":"se1","ts":12083336882,"ji":266837,"di":4,"ty":1},
+{"t":"se1","ts":12083337301,"ji":266838,"ty":0},
+{"t":"se1","ts":12083337361,"ji":266838,"di":3,"ty":1},
+{"t":"se1","ts":12083337408,"ji":266837,"ty":6},
+{"t":"se1","ts":12083337593,"ji":266839,"ty":0},
+{"t":"se1","ts":12083337607,"ji":266839,"di":5,"ty":1},
+{"t":"se1","ts":12083337659,"ji":266839,"ty":6},
+{"t":"se1","ts":12083337716,"ji":266838,"ty":6},
+{"t":"ns1","ts":12083440839,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12083441120,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12083441276,"sd":18,"dd":22},
+{"t":"sd1","ji":266841,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266842,"pi":266841,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266843,"pi":266842,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"sd1","ji":266845,"pi":266797,"na":"Timer: lol-patch.check-patch-timeout","sm":13,"dm":13},
+{"t":"se1","ts":12083440736,"ji":266841,"ty":0},
+{"t":"se1","ts":12083440786,"ji":266841,"di":7,"ty":1},
+{"t":"se1","ts":12083441011,"ji":266842,"ty":0},
+{"t":"se1","ts":12083441034,"ji":266842,"di":22,"ty":1},
+{"t":"se1","ts":12083441144,"ji":266841,"ty":6},
+{"t":"se1","ts":12083441218,"ji":266843,"ty":0},
+{"t":"se1","ts":12083441230,"ji":266843,"di":18,"ty":1},
+{"t":"se1","ts":12083441271,"ji":266843,"ty":6},
+{"t":"se1","ts":12083441382,"ji":266842,"ty":6},
+{"t":"se1","ts":12083522175,"ji":266797,"di":26,"ty":1},
+{"t":"se1","ts":12083522192,"ji":266845,"ty":0},
+{"t":"se1","ts":12083522200,"ji":266797,"ty":6},
+{"t":"ns1","ts":12083548324,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12083548611,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266847,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266848,"pi":266847,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266849,"pi":266848,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12083548224,"ji":266847,"ty":0},
+{"t":"se1","ts":12083548272,"ji":266847,"di":24,"ty":1},
+{"t":"se1","ts":12083548491,"ji":266848,"ty":0},
+{"t":"se1","ts":12083548529,"ji":266848,"di":28,"ty":1},
+{"t":"se1","ts":12083548641,"ji":266847,"ty":6},
+{"t":"se1","ts":12083548688,"ji":266849,"ty":0},
+{"t":"se1","ts":12083548738,"ji":266848,"ty":6},
+{"t":"se1","ts":12083548740,"ji":266849,"di":25,"ty":1},
+{"t":"se1","ts":12083548786,"ji":266849,"ty":6},
+{"t":"ns1","ts":12083648525,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12083648808,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266853,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266854,"pi":266853,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266855,"pi":266854,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12083648437,"ji":266853,"ty":0},
+{"t":"se1","ts":12083648475,"ji":266853,"di":1,"ty":1},
+{"t":"se1","ts":12083648689,"ji":266854,"ty":0},
+{"t":"se1","ts":12083648729,"ji":266854,"di":6,"ty":1},
+{"t":"se1","ts":12083648835,"ji":266853,"ty":6},
+{"t":"se1","ts":12083648907,"ji":266855,"ty":0},
+{"t":"se1","ts":12083648945,"ji":266855,"di":11,"ty":1},
+{"t":"se1","ts":12083648953,"ji":266854,"ty":6},
+{"t":"se1","ts":12083648994,"ji":266855,"ty":6},
+{"t":"ns1","ts":12083750348,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12083750639,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12083750849,"sd":8,"dd":12},
+{"t":"sd1","ji":266859,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266860,"pi":266859,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266861,"pi":266860,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12083750256,"ji":266859,"ty":0},
+{"t":"se1","ts":12083750296,"ji":266859,"di":23,"ty":1},
+{"t":"se1","ts":12083750514,"ji":266860,"ty":0},
+{"t":"se1","ts":12083750556,"ji":266860,"di":12,"ty":1},
+{"t":"se1","ts":12083750666,"ji":266859,"ty":6},
+{"t":"se1","ts":12083750767,"ji":266861,"ty":0},
+{"t":"se1","ts":12083750804,"ji":266861,"di":8,"ty":1},
+{"t":"se1","ts":12083750845,"ji":266861,"ty":6},
+{"t":"se1","ts":12083750945,"ji":266860,"ty":6},
+{"t":"ns1","ts":12083856000,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12083856306,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12083856450,"sd":17,"dd":9},
+{"t":"sd1","ji":266866,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266867,"pi":266866,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266868,"pi":266867,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12083855926,"ji":266866,"ty":0},
+{"t":"se1","ts":12083855944,"ji":266866,"di":27,"ty":1},
+{"t":"se1","ts":12083856199,"ji":266867,"ty":0},
+{"t":"se1","ts":12083856213,"ji":266867,"di":9,"ty":1},
+{"t":"se1","ts":12083856338,"ji":266866,"ty":6},
+{"t":"se1","ts":12083856396,"ji":266868,"ty":0},
+{"t":"se1","ts":12083856407,"ji":266868,"di":17,"ty":1},
+{"t":"se1","ts":12083856445,"ji":266868,"ty":6},
+{"t":"se1","ts":12083856509,"ji":266867,"ty":6},
+{"t":"ns1","ts":12083956118,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12083956415,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12084057623,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12083956556,"sd":16,"dd":15},
+{"t":"sd1","ji":266871,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266872,"pi":266871,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266873,"pi":266872,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"sd1","ji":266875,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"se1","ts":12083956048,"ji":266871,"ty":0},
+{"t":"se1","ts":12083956063,"ji":266871,"di":25,"ty":1},
+{"t":"se1","ts":12083956297,"ji":266872,"ty":0},
+{"t":"se1","ts":12083956335,"ji":266872,"di":15,"ty":1},
+{"t":"se1","ts":12083956407,"ji":266871,"ty":6},
+{"t":"se1","ts":12083956491,"ji":266873,"ty":0},
+{"t":"se1","ts":12083956504,"ji":266873,"di":16,"ty":1},
+{"t":"se1","ts":12083956550,"ji":266873,"ty":6},
+{"t":"se1","ts":12083956602,"ji":266872,"ty":6},
+{"t":"se1","ts":12084057526,"ji":266875,"ty":0},
+{"t":"se1","ts":12084057569,"ji":266875,"di":2,"ty":1},
+{"t":"ns1","ts":12084058010,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12084158551,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12084158811,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"sd1","ji":266876,"pi":266875,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266877,"pi":266876,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"sd1","ji":266880,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266881,"pi":266880,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266882,"pi":266881,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12084057895,"ji":266876,"ty":0},
+{"t":"se1","ts":12084057933,"ji":266876,"di":11,"ty":1},
+{"t":"se1","ts":12084058048,"ji":266875,"ty":6},
+{"t":"se1","ts":12084058092,"ji":266877,"ty":0},
+{"t":"se1","ts":12084058130,"ji":266877,"di":10,"ty":1},
+{"t":"se1","ts":12084058138,"ji":266876,"ty":6},
+{"t":"se1","ts":12084058173,"ji":266877,"ty":6},
+{"t":"se1","ts":12084158447,"ji":266880,"ty":0},
+{"t":"se1","ts":12084158497,"ji":266880,"di":12,"ty":1},
+{"t":"se1","ts":12084158720,"ji":266881,"ty":0},
+{"t":"se1","ts":12084158730,"ji":266881,"di":19,"ty":1},
+{"t":"se1","ts":12084158880,"ji":266880,"ty":6},
+{"t":"se1","ts":12084158949,"ji":266882,"ty":0},
+{"t":"se1","ts":12084158987,"ji":266882,"di":7,"ty":1},
+{"t":"se1","ts":12084158996,"ji":266881,"ty":6},
+{"t":"se1","ts":12084159029,"ji":266882,"ty":6},
+{"t":"ns1","ts":12084265740,"mi":13,"na":"Update /lol-patch/v1/products/league_of_legends/state"},
+{"t":"ns1","ts":12084266042,"mi":14,"na":"Update /patcher/v1/products/league_of_legends/state"},
+{"t":"dw1","ts":12084266207,"sd":13,"dd":28},
+{"t":"sd1","ji":266885,"pi":0,"na":"lol-patch.patch-progress","sm":13,"dm":13},
+{"t":"sd1","ji":266886,"pi":266885,"na":"Event: OnJsonApiEvent_lol-patch_v1_products","sm":13,"dm":14},
+{"t":"sd1","ji":266887,"pi":266886,"na":"Event: OnJsonApiEvent_patcher_v1_products","sm":14,"dm":37},
+{"t":"se1","ts":12084265644,"ji":266885,"ty":0},
+{"t":"se1","ts":12084265687,"ji":266885,"di":24,"ty":1},
+{"t":"se1","ts":12084265917,"ji":266886,"ty":0      Ì      `!                  Ğ      `!                  Ô      !         ÿÿ    Jÿ Ø      `!                  Ü      !        ÿÿ    Jÿ à                     ıÿ  ä      `!               ÿÿ  è                     ñÿ  ì      `!               şÿ  ğ                            ô                            ø      Ì          ?     Pÿ  ü      ì             "  ò‘                                    L            —   ’€       ì             "  ò‘       Ì          ?     ëÿ        L               çÿ        Ì                üÿ        Ì          ?     ›ÿ        Ø               ü        ì                € $      Ø               €  (      L                €  ,                            0                            4      Ø                €  8      !         ÿÿ    õÿ <                            @                            D                            H      Ì          ?     şÿ  L                            P      Ø               úÿ  T      L               ıÿ  X      Ø                €  \      L                €  `      L               ÿÿ  d      Ì          ?     şÿ  h      Ì          ?     şÿ  l      Ì          ?     şÿ  p      Ì          ?     şÿ  t      L                €  x                            |                            €                            „      L                €  ˆ                            Œ                                                        ”                            ˜                            œ      L               €        €              è ¤      L                €  ¨      !         ÿÿ    õÿ ¬                     âÿ  °      Ø               öÿ  ´      L                €  ¸                     úÿ  ¼      L                €  À      L                €  Ä      ,!              ÿÿ  È      L                €  Ì      !         ÿÿ    ÿÿ  Ğ                      €  Ô      L              ¶ÿ  Ø      L              ¶ÿ  Ü                     ›ÿ  à      Ì               ıÿ  ä                     ÷ÿ  è      L                €  ì      !         ÿÿ    ÿÿ  ğ                            ô                            ø                            ü      \         Ÿ    Úÿ                                     \               ÿÿ        \         Ÿ    øÿ                                                                                                                                                     L                  $       !               €  (      \         Ÿ    şÿ  ,                            0                            4      !         ÿÿ    ı 8      \         Ÿ    şÿ  <      !         ÿÿ    ş @      !         ÿÿ    ı D      L                  H      !         ÿÿ    ş L      Ì               ıÿ  P      €              ÿÿ  T      L               ÿÿ  X      \               ÿÿ  \                            `      \          ‰     ıÿ  d      ì             1   ÿÿ h      Ì                €  l      ì               ÿÿ  p                     ûÿ  t                            x                            |      Ø               Şÿ  €      L                €  „      ,!               €  ˆ      Ø                Üÿ Œ      Ø                Üÿ       Ì               øÿ  ”                            ˜      Ì               íÿ  œ      Ì               íÿ                               ¤      Ì               ıÿ  ¨      ì                 €  ¬      L                €  °      Ø               €  ´      ì                 €  ¸      Ø               €  ¼                            À      L                €  Ä      L                €  È      L                €  Ì      \          „     ıÿ  Ğ      Ì               Ìş  Ô       !              ôÿ  Ø                            Ü      Ì               şÿ  à      L                  ä      `!                  è      €               ıÿ  ì      <!         ÿ     ıÿ  ğ      l                  ô      `!                  ø      l                  ü      `!                          !              äÿ        Ì               Ûÿ        Ì               íÿ        Ì               íÿ        Ì               íÿ        Ì               øÿ        Ì               íÿ        Ì               íÿ         Ì               íÿ  $      Ì               íÿ  (      Ì               íÿ  ,      Ì               íÿ  0      Ì               íÿ  4      Ì               íÿ  8      Ì               íÿ  <      Ì               íÿ  @      Ì               íÿ  D      Ì               íÿ  H      Ì               øÿ  L      L               ıÿ  P      Ì               øÿ  T      Ì               íÿ  X      L               şÿ  \      L                  `      `!                  d      L               şÿ  h      L                  l      `!                  p      L               şÿ  t      L                  x      `!                  |      L               şÿ  €      L                  „      L                 ˆ      L               ÿÿ  Œ      L                        L                 ”      Ì               şÿ  ˜      `!                  œ      L               şÿ         L                  ¤      `!                  ¨      L               şÿ  ¬      L                  °      `!                  ´      L               şÿ  ¸      L                  ¼      `!                  À      L               ÿÿ  Ä      L                  È      `!                  Ì      L               ÿÿ  Ğ      L                  Ô      L                 Ø      L                 Ü      `!                  à      Ì               şÿ  ä      L               ÿÿ  è      L                  ì      `!                  ğ      L               ÿÿ  ô      L               ÿÿ  ø      L                  ü      `!                        `!                        L               ÿÿ        L               ÿÿ        L                        `!                        L               ÿÿ        L               ÿÿ         L                  $      `!                  (      L                €  ,      L                  0      `!                  4      L                €  8      L                €  <      L                  @      `!                  D      L                €  H      L                €  L      L                  P      `!                  T      L                €  X      L                  \      `!                  `      L                €  d      L                €  h      L                  l      `!                  p      L                €  t      L                €  x      L                  |      `!                  €      `!                  „      L                  ˆ      L                €  Œ      Ì               ëÿ        \                  ”      `!                  ˜      €              ô œ      L              ü                              ¤      ì                 €  ¬      L                 °      !         ÿÿ    ı ´      !         ÿÿ    ö ¼                            À      L               € Ä      €               € È      L               şÿ  Ì      ì             *      Ğ      ì             )   şÿ Ô                      €     A L P C   P o r t      D e s k t o p      D i r e c t o r y   
+   E v e n t      F i l e        I R T i m e r      I o C o m p l e t i o n     &   I o C o m p l e t i o n R e s e r v e      K e y      M u t a n t        S e c t i o n      S e m a p h o r e      T h r e a d     
+   T i m e r      T p W o r k e r F a c t o r y   (   W a i t C o m p l e t i o n P a c k e t        W i n d o w S t a t i o n      0M      Ğ  ğ2  ğ‡        ğ  ğ”        ğ  à        ğ"  àá        ğB  àé        ğb  à        ğ‚  à$        ğ¢  à‘	        ğÂ  à	        ğâ  à¯	        ğ  àÉ	        ğ"  à¤        ğB  à®        ğb  à·        ğ‚  àÂ        ğ¢  àÊ        ğÂ  àÒ        ğâ  àÜ        ğ  à        ğ"  °T     P  ğB  ài        ğ’  àq        ğ²  à{        ğÒ  à‡        ğò  à        ğ  à©        ğ2  °œ     P  ğR  à±        ğ¢  Ğ¶     0  ğÂ  Ğ¿     0  ğò   `     ˜  ğ"  P`     ˜  2  €`     ˜  0B  °`     ˜  ĞQ  à`     ˜  pa  a     ˜  q  @a     ˜  °€  pa     ˜  P   a     ˜  ğŸ  Ğa     ˜  ¯   b     ˜  0¿  `b     ˜  ĞÎ  b     ˜  pŞ  Àb     ˜  î €¿|     °  °ı €ï|       `    }     ˜  €  P}     ˜      €}     ˜  À/  °}     ˜  `?  à}     ˜   O  ~     ˜   ^  @~     ˜  @n  p~     ˜  à}   ~     ˜  €  Ğ~     ˜           ˜  À¬  0     ˜  `¼  `     ˜   Ì       ˜   Û  À     ˜  @ë  ğ     ˜  àú ì¤Ä        €
+	 èIê       €	 @       €	 ğ
+    Ú(  €	 Ø3    ”  `9	  8    j    <	 9    *  p<	 8<    j    ?	 ¤<       @	 ¨e    :   0@	 ˜f    H   p@	 €g    H   À@	 €h    @   A	 øk    H   PA	 °l        A	 ho    H    C	 Pp    D   ğC	 `{    H   @D	 ¸}       D	 Ğ†    H   F	 €‡    B   àF	      H   0G	 °    @   €G	 ĞÕ    H   ÀG	 ×    H   H	 ÀØ    V   `H	  Ù    <   ÀH	 øÙ    H    I	 àÚ    <   PI	 ÈÛ    H   I	 °Ü    :   àI	 (Ş    H    J	 ß    B   pJ	 (á       ÀJ	 hä    H   ÀL	 På    <   M	 Èæ    H   PM	 °ç    >    M	 ˆé    H   àM	 8ê    H   0N	 èê    H   €N	 ˜ë    H   ĞN	 Hì    H    O	 øì    H   pO	 ¨í    H   ÀO	 Xî    H   P	 ï    H   `P	 ¸ï    H   °P	 hğ    H    Q	 ñ    H   PQ	 Èñ    H    Q	 xò    H   ğQ	 (ó    H   @R	 Øó    H   R	 ˆô    H   àR	 8õ    H   0S	 èõ    H   €S	 ˜ö    H   ĞS	 H÷    H    T	 ø÷    H   pT	 ¨ø    H   ÀT	 ğı    <   U	 hş    @   PU	         U	 Ğ    @   W	 h    >   ĞW	 (    :   X	 ¸ò       PX	 à-    X   PZ	 Ù    6   °Z	 Ğé    L   ğZ	 @ö    @   @[	 0÷    B   €[	 `ù    @   Ğ[	  ú    @   \	 û    @   P\	 Àı    @   \	 ş    B   Ğ\	 °ş    @    ]	 Ğg    >   `]	 èj    :    ]	 w    <   à]	      >    ^	 è    >   `^	 x    8    ^	 À    <   à^	 ˜    :    _	 à    >   `_	 (‘    :    _	 p‘    >   à_	 ¸‘    >    `	 H’    8   ``	 Ø’    >    `	 °“    >   à`	 ø“    <    a	 Ğ”    <   `a	 •    <    a	 ğ•    8   àa	 8–    <    b	 ˜™    :   `b	 `    >    b	 ÈŸ    >   àb	 €±    :    c	 pµ    :   `c	 ¸µ    >    c	 @¸    <   àc	 `¹    >    d	 ¨¹    <   `d	 8º    >    d	 0¼    <   àd	 ¨Â    >    e	 Ä    >   `e	  Ä    <    e	 xÅ    >   àe	 àÆ    8    f	 èa    P   `f	 @°       °f	 PÏ    H   °h	  Ğ    H    i	 `Ñ    H   Pi	 Ò    H    i	 ÀÒ    H   ği	 pÓ    H   @j	  Ô    H   j	 ĞÔ    H   àj	 €Õ    H   0k	 0Ö    H   €k	 àÖ    H   Ğk	 ×    H    l	 @Ø    H   pl	 ğØ    H   Àl	  Ù    H   m	 °Û    H   `m	 İ    H   °m	 Àİ    H    n	 pŞ    H   Pn	  ß    H    n	 Ğß    H   ğn	 €à    H   @o	 0á    H   o	 àá    H   ào	 â    H   0p	 @ã    H   €p	 ğã    H   Ğp	  ä    H    q	 På    H   pq	  æ    H   Àq	 °æ    H   r	 è    H   `r	 Àè    H   °r	 pé    H    s	  ê    H   Ps	 Ğê    H    s	 €ë    H   ğs	 àì    H   @t	 í    H   t	 @î    H   àt	 Xó       0u	 p¶       0w	 ˆ¼       0y	 8ß    J   0{	 ß    P   €{	 Pˆ    N   Ğ{	 XÀ    T    |	 ğ       €|	 Èş       €~	 ¸Ä    @   €€	 ˜Æ    @   À€	 8Ç    @    	 ˆÇ    @   @	 èË    B   €	 ÈÒ    @   Ğ	 8Ö    @   ‚	 ¸Ø    @   P‚	 !    J   ‚	 €%    J   à‚	  /    H   0ƒ	  	¢	       €ƒ	 @¢	    À  €…	   £	    ‹  @‡	   ¤	    ‹  Ğˆ	 ä³¡
+       `Š	 TZ¨
+       `Œ	 8bß    6   `	 ¸Òß        	 Rã    ¼    	 H(å    œ   `‘	 07æ    H    ’	  Eæ    H   P’	 ÀIæ    H    ’	 pJæ    H   ğ’	 €Læ    H   @“	 0Mæ    H   “	 ğOæ    H   à“	  Pæ    H   0”	 PQæ    H   €”	 àËç    ¼   Ğ”	   ”    €  •	 Èİİ       —	   Ÿs    €  ™	 ´Õu       š	 ìWÆv       œ	 €‚Vw       	 [w       °	 Ì]w    P  ° 	 ì]w        £	 \]w        ¥	 ¬,]w        §	 ¬2]w    0   ©	 3hw       0«	 7hw        P«	 €]hw    $   p«	                                                                                                                                                                                                                                                                                                                                 \1M @n]w¤1M ü N   N    	          H2M     ÜBZwH2M ˆN    8½NU4N   N     AZw”2M ,N    |     ğ2  ì              ¶İ”¢2M =Zw”2M H2M ø1M ô1M ä1M ì1M      3M t3M         ,N         À| 8½NU    ğ|                        Ü2M U8Zw          ”2M H2M 4M     ³8Zw    @                                                               03M     “Ô   “Ô        43M                    Ğ2M Ğ2M Ğ2M           ÚŞ”¢L4M 4M Á5Zwt3M     ,   X5M     36Zw       “Ô                                                 € À3M                              3M  3M  3M                                                                                                                                                                                                                 nØ”¢X5M     ¨7M         84M    œìM ™]w    8½NUx5M ZZw    ¤4M À7M ¨7M ¶Ø”¢À7M 5 À           €4M     œìM ™]w¶W¿Õşÿÿÿp7M CZw    ø4M ˆ<M €íØu×Zw           À7M         @\hw@\hwPå                                         “Ô                                                               `5M   v S C P A P I . d l l                                           @6M $µì86M •VZw       7M                              Ğˆ d           ¸öæ        µì  ˆ        >Ú”¢ 7M 7M 4  À ˆ 6M Lˆ Ì6M 7M Ü6M ÷VÖu 7M  T6M ¸¬¶  €    °VÖuDb^w(¹ì    '   7M ŸÚø6M •VZw$       À7M            ¸       `   Ğˆ d   †‡Zw     ZĞ        ŸÚ  ˆ    òÚ”¢Œ<M À7M 4  À  ˆ È6M X   ˆ7M À7M ˜7M ÷VÖuŒ<M  7M ü ¬¶  €    °VÖu   Db^w˜¢Ú       <M X X ˜¢ÚŒ<M     d       0ZĞ	       & 	 ¸         V   €7M †‡Zw              €À7M ”7M 8»Xw      ˜¢Ú¤7M ¸       8M DDÖu`§ãul¬¶ˆ<M X?M Œ<M         À°NmR    X?M         ¸          °7M    œìM `ìØu\fÃşÿÿÿ,8M œBÖu   X?M      Œ<M         `<M RmR  €X?M     `<M RmR ÀÇX?M ¨ú                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            	 <M ü¡ç        <M 4òÛ<M •VZwz        ÀÇ          (  Ğˆ d       8   Hˆ Db^wğ¯ç  ğøÛ         òÛ  ˆ    d       €Õ         è¡çğ¯çpÕ  Pˆ 4<M †‡Zw             ÀÇ Dú+   H<M 7ùR      ğ¯çX<M vò‹Rğ¯ç    d<M ËRğ¯ç¨ÏM n¬qR °ç    ğğû¨ú         ÀÇ         °ç     Dú                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           SOFTWARE\NVIDIA Corporation\Global\Stereo3D                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 iM @n]wTiM ü N   N    	          øiM     ÜBZwøiM ,N    Ä¾5|N   N     AZwDjM ,N 
+   |     ğ2  ì              f…”¢ÌiM =ZwDjM øiM ¨iM ¤iM ”iM œiM     °jM $kM         ,N         À| Ä¾5    ğ|                        ŒjM U8Zw          DjM øiM @lM     ³8Zw    @                                                               àjM     ÚmM   PkM tjM @n]wäjM ü N     øjM kM    €jM €jM €jM           Š†”¢   @lM Á5Zw$kM     ,   ¸lM     36Zw      PkM                 4kM     ¬kM `kM           M       € pkM ŒlM       ÈmM  
+ 0|Vw    PkM PkM PkM                                                           e r n e l b a s e . D L L                         økoM                     Ä¾5    oM ho¸lM ¸¾    ¿(\w        økoM  lM ¹úYwhfhw¸lM øk    €”¢¸lM ¤lM øk2Zw	   PlM š÷YwøkoM V€”¢¤lM økØoM     ¸lM     0oM     ÖW¿ÕlM hlM ØnM ™]wŞV¿ÕşÿÿÿènM CÚZw    ú‡”¢økènM µÚZwOÚZwî‚”¢øk    ØoM $              p   ÿÿÿÿÿÿÿÿçÙZwµÚZw0oM økoM           ÀlM k e r n e l b a s e . D L L                                                                                                                     †”¢pnM     ÄpM         PmM        RÖlSnM şÿÿÿÈmM ZZw    ¼mM ÌpM     Î”¢ÌpM                ˜mM     ÀÄM ™]w   ÈmM   e r n e l b a s e     ×Zw    øk   ÌpM     	   4l\hwøk    L       nM     ş½                ØÅ¸                    z‚”¢  Æu¼nM   Æu    ğ Æu    HnM     ÀÄM ™]wV¿Õşÿÿÿ¨nM ğÛYw     Æu          Æu©Ÿ*w©Ÿ*wğ Æu   ÀnM ;ÕYw  ÆuÀƒâu©Ÿ*w©Ÿ*wğnM UdXw  Æul  ˜¡âu%»Ywho    ØoM şÿÿÿİí  ©Ÿ*wˆoM 8M^w0oM òM^wøk	   N^w     @æ   økho©Ÿ*w    
+ 
+ Ÿ*w             @  àl                                                            Naw
+ƒ”¢ˆpM 8Zwøk]Æ³    HZwÿÿ  l‰M +Zw    ¸pM     ¼Å¸        	   ]Æ³ @æ	       @”Õuøk¼Å¸                                                                                                            ôpM     l‰M                 ¤g€g pM çZwl‰M  8Ñ[w\‰M    l‰M t   8œ”¢ÄpM ÄpM l‰M ZÄ³\‰M 5   j   /   üxM `Ç³l‰M `Ç³l‰M Æ¸\‰M l‰M Ê³5   l‰M       4   d : / g a m e s / l e a g u e   o f   l e g e n d s / g a m e / l e a g u e   o f   l e       ÁĞµ¼‘M èvM    rM òÿÿÿ,rM \vM     ¨qM CÏµèvM    ,rM .ãòÿÿÿrM ,rM rM rM ÌqM .Ãµ    ¼‘M rM pvM D·µs   ,rM pvM ®µ    %   x©µ¼‘M ÿ  ©µ    PR¹@Åê        ’M ÿ  %        rM        ğqM .ãØÄ¸ÜvM %               ÿÿÿÿ        èvM                                                                                                                                                             ˆsM ä‚ã€sM •VZw        tM   /€Zw¦Ÿ”¢ tM     I€Zw    `   Ğˆ d   %   J   ßß        Ğ‚ã  ˆ             `     ˆ èˆ T   4ˆ     œsM ßŒ¶tM     4tM svM ÛÿÿÿPR¹@Åê ĞµÈsM şÎµÈsM Ïµ1 M LtM ÿÿÿÿ4tM LtM    1 M ìsM .Ãµ    yM 4tM xM D·µn   LtM xM ®µ    2   x©µyM ÿ  ©µg r PR¹@Åê  a     €yM ÿ  2        tM        tM .ãºÅ¸ yM 2                     uM ¥âøtM •VZw%       xuM   /€Zw™”¢xuM     I€Zw    x   Ğˆ d   2   d   °İß        ø¤â  ˆ             x     ˆ ôˆ n   ¤ˆ     Ø©â ˆ ˜­âuM şSZwn   şSZw             xM xuM ŒwM (QZwà©âxuM d           ±QZwd ±QZ ¼Vwà©â        d Vwd xuM    xuM 8xM            C : \ P r o g r a m D a t a \ N V I D I A   C o r p o r a t i o n \ D r s \ n v d r s d b 1 . b i n                                                                                                                         ãu¨…ãu        ˆ‘M ÄvM Z¼³wM Z   ¬‰M    ¬àZ   °vM 4µ³¬à¬‰M        Ô£M ˆ‘M ØvM l‘M pxM æ³ˆ‘M ¼¡M `   œà ¨è         D   ,   ¬à                                                                                                            Db^wØ©â                         d       Àİß
+        
+ ø¤âØ©â°İß      ¼wM †‡ZwÑ[w                    ®›”¢¬éÖu`xM ÍéÖu        ˆ‘M ëéÖu`          €   € €    ¬         l n Ø©â    Ñ[w    Ë]w(ŞÖulxM   ””¢    œxM BŞÖu    yM àÌ ˆ‘M ˆ´M ÿÿ  "  pxM txM £¥³ˆ‘M ¼¡M èÌ ÿÿ  #  ÜxM ğxM }¬³ĞxM \‰M l‰M ˆ‘M          @    ÀxM ¾4ØuÀ  ˆ‘M ˆ‘M   2   ˆ‘M œ­ ÿÿ  ¤  ìxM ôxM ³èxM ˆ¢M    l‰M 3      ¤   3    ‰M ¹³yM     À;  p¹³¼  Ğ  \‰M    C : \ P r o g r a m D a t a \ N V I D I A   C o r p o r a t i o n \ D r s \ n v d r s d b 1 . b i n        ğ2  ì              ¦•”¢zM =Zw„zM 8zM èyM äyM ÔyM ÜyM     ğzM d{M         ,N         À| Ä¾5    ğ|                        ÌzM U8Zw          „zM 8zM €|M     ³8Zw    @                                                                {M     ~M   {M ´zM @n]w${M ü N     8{M H{M    ÀzM ÀzM ÀzM           Ê–”¢   €|M Á5Zwd{M     ,   ø|M     36Zw      {M                 t{M     ì{M  {M           M       € °{M Ì|M       ~M  
+ 0|Vw    {M {M {M                                                           e r n e l b a s e . D L L                         øk\M                     Ä¾5    \M hoø|M xó½    ¿(\w        øk\M @|M ¹úYwhfhwø|M øk    ^”¢ø|M ä|M øk2Zw	   |M š÷Ywøk\M –”¢ä|M øk€M     ø|M     pM     ÖW¿ÕP|M ¨|M M ™]wŞV¿Õşÿÿÿ(M CÚZw    :”¢øk(M µÚZwOÚZw.“”¢øk    €M $              p   ÿÿÿÿÿÿÿÿçÙZwµÚZwpM øk\M            }M k e r n e l b a s e . D L L   [wğŸı0Ù   @                 v³ëF   YEas»c  Ñªj÷ÿÿÿÿ   HalT ğş        A3  HR b¶ 0ÙğŸı!kwR0Ù”}M  O      Æ‘”¢°~M     M sN¸    }M        RÖlSĞ~M şÿÿÿ~M ZZw    ü}M M     ’”¢M                Ø}M     TÏM ™]w   ~M   e r n e l b a s e     ×Zw    øk   M     	   4l\hwøk    L       Ğ~M     Pî½                ØÅ¸                    º’”¢  Æuü~M   Æu    ğ Æu    ˆ~M     TÏM ™]wV¿Õşÿÿÿè~M ğÛYw     Æu          Æu©Ÿ*w©Ÿ*wğ Æu    M ;ÕYw  ÆuÀƒâu©Ÿ*w©Ÿ*w0M UdXw  Æul  ˜¡âu%»Ywho    €M şÿÿÿİí  ©Ÿ*wÈM 8M^wpM òM^wøk	   N^w     @æ   økho©Ÿ*w    
+ 
+ Ÿ*w             @  àl                                                            NawJ“”¢È€M 8Zwøk]Æ³    HZwÿÿ  Œ™M +Zw    ø€M     ¼Å¸        	   ]Æ³ @æ	       @”Õuøk¼Å¸                                                                                                            4M     Œ™M                 ¤g€gà€M çZwŒ™M  8Ñ[wx™M    Œ™M T  „‚M òaZwÛ|Zw‚n”¢  ¦  œ‚M òaZwÛ|Zwšn”¢  ¦  8ƒM Ì ×Œ™M 
+ 	0M C : \ P r o g r a m D a t a \ N V I D I A   C o r p o r a t i o n \ D r s \ n v d r s s e l . b i n   İ 0ãÔ   
+åÿÿ    l.ã§h.ãr/ãìµ  Çìµ8  xµb   ìµ  Ç¸   8  xµ  À °µ¸     `tİxµ  Õ÷Zw¸   Ø‚M iŒZw   htİ8  ›ŒZwŞn”¢`tİ      b  b        8b   `tİ¦    Ö   8      `tİb   ˆ               .ã+ĞµHˆM d…M    øÿÿÿDƒM ,ƒM t‡M     È‚M ®Îµd…M    DƒM .ãDƒM ,ƒM ½Îµ    ä‚M ¨Àµ-zïä‚M ÛÀµ    HˆM ,ƒM         ˆ‡M ®µ       z¦µ0v
+HˆM Ÿ¦µ   PR¹@Åê        PˆM @          ƒM        ƒM .ãDˆM 0ˆM               ùÿÿÿ       d…M     n¶htİPı      Àı   <¸p…M Rq¶PıL†M ô…M `q¶  İ    Pı      Ğı  b   ;   ä·   xµgtİ    
+ 	9İ    öW¿Õ
+ÿÿ    
+ 	b   P`İä·  M  ’ı8  şÿl„M b^wü†M ™]w6P¿Õşÿÿÿ„„M b^w    Db^whtİ  htİ°    C   ¦       °     C   ¦  ˆ„M     htİ      „M  „M †‡Zw            ltİ’ı´„M 3Š¶      htİDb^w•ı  H–ı  H“ıDb^wĞ‹ı  ˆŒı    YĞ         d       YĞ          ~ıĞ‹ı€YĞ  Pı8…M †‡Zw            XŒıĞ‹ıL…M 3Š¶      Ğ‹ıh…M °ù¶Ğ‹ıĞ‹ıL†M Pı20fdd1f9yû¶Ğ‹ıL†M „…M V¶Hv¹¼…M  d¶   “d¶Y}ïL†M Pı   ”…M    (†M  XµõÅëÿşÿÿÿ      `†M ts
+X†M •VZw!       S¹     ô…M     `t
+Db^w`t
+   Ğˆ d   8†M Md¶S¹X†M õ´¶      À†M ts
+¸†M •VZwn       hÓâ        è†M |óŞà†M •VZw       €     Db^w¨œ        `s
+  ˆ   Ğˆ d     Db^w`ÎÚ  $ÄM hóŞ  ˆ !          d   èÓâ   |‡M Ô†M ¶Hv¹è†M ä†M V¶hÓâ      ø†M ¶Hv¹¸‡M     ’²²¸‡M  u
+    !u
+¸‡M        u
+
+‡²T‡M Z¸² u
+                   0v
+èˆM ø‡M ùË²0v
+èˆM  ÄM $ÄM  v
+    0v
+¤‡M     ãu€ãuxµ     áqYw¨ˆM     0   l‰M ¼  8rYw   ˆM   Zw    ´ãu        –d”¢ mİ                                                                                                                                        
+ 	8  P`İ              `s
+0w
+ÀÄM ™]w6P¿ÕşÿÿÿìˆM b^w    Db^w(mİ                                                  €v
+ªk”¢‰M FöÖu««««ü]wjöÖu¼  l‰M ˆ‘M       ÌÄM ÓÃ³¼  ˆ‘M æ±³(mİF   ÑH²)<ïÀ;      —I²¹³P‰M  ÏM            ¯ªğÄM øÄM E   F   (mİg r d : / g a m e s / l e a g u e   o f   l e g e n d s / g a m e / l e a g u e   o f   l e g e n d s . e x e                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       >      ¢X¦              ì“M    ¶‘M 	   	   *      ¢X¦              ”M    ä‘M       ,                     L”M    ’M       ,                                                                             0M sª•y¨€éy[œ•ydM dœ•yß"wÜ•y €éyğ£Zwš¯y\M ;­•y¨€éy[•ytM d•y¨€éyaŸ•y •M Ù™¯y•M J€òy €éy                                                                                                                          ë                    è“M …ó   …ól‘M OÀ¦<‘M <‘M :      è“M CÊ”|”M @‘ó   @‘óœ‘M OÀ¦l‘M l‘M &      ”M PlÕ‘    EàñDàõDà        ?’ó      >’óñ?o©Ø“M mÄ¦@‘óÿ   ñDà&   ”M @‘ó+   }Ä¦@‘óíDà       ÿÿ  ÿÿ    ÿÿ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ©¾Ë •M ¹å¢@‘óÿ   ³ä¢ ‘ó    4   ìDà‡   Œå¢X•M     +    ‘ó                    äĞ  xµ  Ì(ó8	ó    À(óÈ(ó  Õ÷Zw  ¤”M ½Zw   È(óÿ  äĞ  À(ó  äĞ  *HâäĞ    Ç    äĞ  %Hâ ğ”M cÂZwäĞ    À(ó`šõ%Hâ   ¼•M    (ó`šõ       hšõÅ×    È•M ğŠZwÈ•M ÅZwäĞ  ›ŒZwÎy”¢À(ó      °‚ 2             `Gâ®šóÈ(ó  4N  ³šó*HâÀ(ó`Gâ              *Hâÿ            @Hâ       -   À     }Eà.          °‚  @	óğ@        äĞ  x—         úM ™]w6P¿Õşÿÿÿ$–M b^w    Db^wÈ(ó   kŞéDà°         P–M Ì¢È(ó`Gâå   yEà        È(óÈ(ó  ´–M D–M †‡Zw                È(ó`ß"wX–M ò÷·  #   p  Db^w˜#     XGâĞÕá  #  ##   `—M iŒZw   `Gâ#   ›ŒZwf{”¢XGâ        Ì–M †‡Zw            àDàå        #     XGâàDàğ–M    àDà    `Gâ   àDà   Œ¢
+ì6€Ÿ
+¹    æ        # it    #  #    óûe„  ?2 ’ÅĞ#   *Äã»È   úM ™]w6P¿Õşÿÿÿ¼—M b^w    Db^w w  `á«
+           tñ€á«
+d       PÓN       + N °` w@Ó  €Ÿ
+`á«
+tñXñ`á«
+Xñ`á«
+@ŞYw «
+Ç  tñ`á«
+ˆ
+@˜M  Ÿ
+`á«
+8u¯6`á«
+@ŞYwˆ
+6 Ÿ
+        ÛFïÑ3¨ŸM  ğM  İå3    
+6„÷ï    ˆ
+   ¢
+¢
+¢
+¢
+    ¢
+xM „÷ï                 ¢
+™éØQ7ÛFï            M         ¨ŸM          ŸM ™éØQ7ÛFï                            è˜M         èI ü  ´]¸y    àª2             ™M          2¸¸\w     Ì×´@      <“hw    °F       VsËÀ              „™M `–M  úM Àqy6    qyÿÿÿÿ    <“hw    ğ¿Ô™M û¸\wìhhwĞšM €šM        €šM ĞšM    ¸€šM ĞšM         ° À| ÿÿÿÿ        hšM ¤†\w   äŸM °  ·†\wø™M       shaders nes                         (šM       shaders nes                                                 êu”¢ İ6;]w[]wD;]wĞšM       À        àª2       àª2                                                                      Ñ[w    ›M ›×u    ›M PÁó›M “v@›M x@vØ     ´M M°v q”¢ÔM ›M ˜M ˜M ¿·vLOR_MOD.x@vØ ¸nZwPÁó                    Û|Zw q”¢                ÔM     7/]     \M                       M 	   ˜nZw@	ó    Û|Zwjq”¢  l  M     Û|Zw‚q”¢     M ]È •ÿ   ]È •f   V.ÿÿ(Zò      ]È • |ZwäĞ 4¦     äĞ 4  K
+À     ÿ  ;  à9ÿÿ=  :ÿÿ@	óŠÁ[w-   Ò7ÿÿ]È     Æ¥£7ÿÿ…  £7ÿÿ    	 xLK
+  =  ˆ¶  ÇòaZwäĞ  xµ  À 8	ó    À(ódM òaZwÛ|Zwbr”¢  $    ŸM È(óÿ  äĞ  À(ó  äĞ  ì  äĞ  	     äĞ  Õ÷Z   cÂZw	   À(óøló›ŒZwîq”¢    l G ÈM €CäŒWZwˆCä       ÿöÿÿ°ïK
+       şöÿÿğ­÷ŒWZwd88   Hˆ d         àÑã        ø.ä  ˆ       €      À ”Ôˆ 0       øCä        àM şSZw@              xLK
+8       p F ¸K
+              ¨ïK
+    À¨ïK
+°ïK
+      ¸M ¼çK
+°M •VZw1             ØM ÙK
+ĞM •VZwI            d     øM Xk           Ğ d          0k        øØK
+                     Ä    d	     ğÚK
+`	 °ïK
+ôM şSZw   şSZw              ŸM ŸM €uv            äá°ïK
+$ŸM =Lv    °ïK
+HŸM ¼‡æz    0   tñ@¿¬
+äá0   ¸Oê@ŞYw¸Oêştñ´ŸM ´ŸM  İ İ§2°ïK
+´ŸM P¦2à   àzäE 20ğM °ïK
+¡2@‚œ
+D©¨
+ç„è]¡2äŸM  ğM ´ŸM à    P   ÿÿşÿ! CTAB   O    ÿÿ         H   0         8       SAMPLER            ps_2_0 Microsoft (R) HLSL Shader Compiler 9.29.952.3111      €       €  °       B    €  ä° ä     €  ä€  ä   €  ä€ÿÿ          position_offset_scale rotationMatrixData texcoord_offset_scale vertColor vs_2_0 Microsoft (R) HLSL Shader Compiler 9.29.952.3111 «««Q        ?  €?             €      €     €  DÑ î Ñ D    €Ñ ä    € î€     ä€    €  ä€ D    €  ä€Ô      €  í€  è€    € ä€  ä€    €  U     À  ä€Î ô    €  ä€Ì ô    €  ä€Í ô     €  ä€Ï ô     ÀĞ ä    € ä€    À   €    à äÒ î Ò ä     ĞÓ ä ÿÿ     `   `   %   ¨è pÂ &       ÔÌ !   ª àÌ "   ª èÌ #                                                                                                                                                                                                                                                                                                                                           şÊ4 Ô¸     x   ã"              ü&                  œà d : / g a m e s / l e a g u e   o f   l e g e n d s / g a m e /                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                İÊ4                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       ÔÌ ª     ÿÿÿÿÿÿÿÿ       àÌ ª ÿÿÿÿ                ÿÿÿÿ   ä  4                                                                                                                                                                                                                                                                                                           ãu           ãu           ãu                                   ãu¸¶M ÿÿ  P¶M †yÖu@§ãu               ğ»M ¼¼Öu       ğ»M ¼Öuº¶M        
+   &¼Öu   º¶M     LMQ „ÀT   M        —LMQ     „ÀT 	  P¼M      d d d d ,   M M M M   d ,   y y y y   d ,   y y y y   M M M   d ,   y y y y                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   '       
+          d   ŒÁM ½ÖuØ0ã`#wˆ¼Öu½ÖuP¼M     LMQ „ÀT   M        —LMQ     „ÀT 	  ÜÁM    d d d d ,   M M M M   d ,   y y y y   d ,   y y y y   M M M   d ,   y y y y             T¾M òaZwÛ|ZwRR”¢  ¦  l¾M òaZwÛ|ZwjR”¢  ¦  ¿M Ì ×    
+ 	 ½M      Ì ×€×u
+ 	½M ›×u     €×uÌ ×,½M ˆ¿M     Hnİ    4ÀM D¿M ‚i¶4ÀM ƒ   Ç   ıäÿÿÉ   •şÿÿ0qİ 0ãÔ   
+åÿÿ    l.ã§h.ãr/ãìµ  Çìµ   xµÉ   ìµ  Ç   Ÿ  xµ  À ¼µ    (qİxµ  Õ÷Zw  ¨¾M iŒZw   0qİŸ  ›ŒZw®R”¢(qİ      É  É      ˜¾M ¥â¾M •VZw1       0         (qİJ  $        x   Ğˆ d   ;   Db^wÈ:ä     ø¤â  ˆ           d       ğÑã5       } 5 ø.äÈ:äàÑã  ´¾M ´¾M †‡Zw           È:ä  È:ä¸¿M §–Zw     È:ä¾S”¢À:ä  PÀM   °       ¦  ¿M     0qİ      ¿M  ¿M †‡Zw            4qİPı4¿M 3Š¶        0qİX¿M >n¶d¿M @n]w¬¿M ü N   N    	          PÀM     ÜBZwPÀM ´N    Ğí0lN   N     AZwœÀM ,N    |    ğ2  ì   xÃM    VP¿Õ¾S”¢$ÀM =ZwœÀM PÀM  ÀM ü¿M ì¿M ô¿M     ÁM |ÁM È:ä    ,N        HÀM  ÀM çèYwdÀM °WVw   ÃM    ÃM    tÂM §çYwT   KèYwÃM     5èYwÃM ¨ÂM    & vÀM C : \ W I N D O W S \ S y s W O W 6 4                           8ÁM     *ÄM   ÄM é:äø 9S<ÁM   M ÜÀM @n]w$ÁM ü N   N    	          ÈÁM     ÜBZwÈÁM „N    ÔWhô,N   N     AZwÂM ,N     |     ğ2  ì    À    ;S6-”¢œÁM =ZwÂM ÈÁM xÁM tÁM dÁM lÁM     €ÂM ôÂM xÁM     ,N         À| ÔWhô    ğ|     0 höZÃM          ZÅM \ÂM U8Zw           ÂM ÈÁM ÄM     ³8ZwP   @   l        EæDÆM 8[w8[wÃM  EæDÆM         @ÃM (Ş \hwø¾ÃM dŞZÃM ¿(\w         EæDÆM XÂM ¹úYwhfhwÃM  Eæ    v.”¢ÃM üÂM  Eæ2Zw	   ¨ÂM š÷Yw EæDÆM ®.”¢üÂM  EæDÆM     ÃM     €ÅM     ÖW¿ÕhÂM 0 ş0ÅM ™]wŞV¿Õşÿÿÿ@ÅM CÚZw   R.”¢ Eæ@ÅM µÚZwOÚZwF)”¢ Eæà9SDÆM $      0ËM œÔp   Ï4²ÿc+ôûçÙZwµÚZw€ÅM  EæDÆM        B  ÃM C : \ W I N D O W S \ S Y S T E M 3 2 \ g d i 3 2 f u l l . d l l   tÃM       FÆM ÅM ÔWhô    ìÆM ˜fˆÄM ğ½w    ¿(\w        hoìÆM ĞÃM ¹úYwhfhwˆÄM ho    î/”¢ˆÄM tÄM ho2Zw	    ÄM š÷YwhoìÆM &(”¢tÄM ho¨ÇM     ˆÄM      ÇM     ÖW¿ÕàÃM 8ÄM ¨ÆM ™]w    ÄM   x t - m s - w i n - g d i - i n t e r n a l - u a p - i n i t - l 1 - 1 - 0 . d l l   hoìÆM           ÄM N T D L Ê(”¢  KuÅM   Ku   Ku    ˜ÄM    pÈM ™]wV¿ÕşÿÿÿøÄM ğÛYw     Ku          Kufô:Sfô:SKu¨9ÅM ;ÕYw  KupVufô:Sfô:S@ÅM UdXw  Kuï  |Vu8.Vu(Şfô:SLÆM P   Œq  fô:S àd Âz €;S+]wÛ£zÿÿÿÿÔÅM ØÅM    ÌÅM (Ş(Ş  qw¬ÅM hÅM à9SpÈM ŒâZw €;S¼âZw     €;SXF­ÜÅM  €;S    XF­ÜÅM _àZwìEæ    EæˆÈM ìEæ Eæ       €;S       EæˆÈM ®ßZwYŞZw†$”¢ €;SrŞZw                    ¨¹íR    @İàu  Vw                   €;Sô:S €;S÷Pu(Ş Eæ÷PuXÆM     ÷Pu          VwËkãuËkãuğ Vw. dÆM ;ÕYw  Vw`ÔfwËkãuËkãuÀÆM UdXw  Vw	  Œúfw%»Yw˜f    ¨ÇM şÿÿÿ3. ËkãuXÇM     )  hÇM ÃÚ`ÇM •VZwp             ˜fËkãu      Åkãu    ˆ   Ğˆ d   Pp    HZĞ        ÃÚ  ˆ        wâ    àÇM óZwhÈM    ÿ  à     €                ;Swâ0ÈM óZw    wâ     €  ¨ÇM øÑZw                €       ÿ  àÇM ŒÈM    0ÈM Ğ>9S        wâ    èÇM 6ÉZw    Xˆår+”¢ÈM ĞZw0ÈM     wâ    wâ [w0ÈM     wâÈÈM ![w<wâ ;S    F[w59Sx       ¼      59S          9S                    †$”¢    ˆÈM         ĞÈM ™]wîP¿ÕşÿÿÿàÈM +Zw Eæ÷Pu  9S Eæ9Zwİ
+Zwæ$”¢              ˆ9S Eæ    ÷Pu_¶:S%   ÉM PÉM ™]wvW¿Õşÿÿÿ ÉM µ¡:S  9Sô:S    @İàu €;S     ÉM v¶:Sô:S €;S49S   9”:S   `ÉM ¬¤:S  9S       ˆ«Pp¥:SˆÉM        4ÉM ØwĞÉM ğ±:Sè“'OşÿÿÿtÉM ¥:S  9S   ôEæ Eæ2Zw  9S           p¥:S  9SàÉM 'ÿYwp¥:S  9SWÿYw=ÿYwæ%”¢$ÊM     e 2XÊM ¬âãPÊM •VZwH       ˆ<ä  ôEæ EæpÊM •[w®  v&”¢   Hˆ d   $      ÏãDb^w Ÿâ                    d       ØŞß$       ) $ ğ„â ŸâÈŞß   Eæ|ÊM †‡Zw            !    Ÿâ  °ÊM sù[w`ËM à\hw    \ËM  õLËM ÈÛ2Zw|       \ËM ;ùYwÂøYwş&”¢LËM ÈÛ”ÎM     `ËM 5 ÀĞÍM  EæÖW¿ ¸ÊM 0 ş€ÍM ™]wŞV¿ÕşÿÿÿÍM CÚZw   ¢&”¢ÈÛÍM µÚZwOÚZw–!”¢ÈÛĞ&åv”ÎM $          œÔ`   ÿÿÿÿc+ôûçÙZwµÚZwĞÍM ÈÛ”ÎM        <  hËM C : \ W I N D O W S \ S Y S T E M 3 2 \ d x c o r e . d l l                                     ü/ÆvOc]fc] ÀÇpÌM €Û  @  @€Û °ÌM ÒKjR         DúpÌM €Û    @ÌM ÒPR   @ÌM õPR4ÌM €Û@ €`k÷  @     °,ÍM ]PR    b÷     ğşÿÿÿÿOİ[wüÌM  ÍM    pÌM   x t - m s - w i n - d x - d 3 d k m t - d x c o r e - l 1 - 1 - 0 . d l l   Æv¡e»ëF   ¾Š~»c  Ñªj÷ÿÿÿÿ   HalT ğş    !”¢  9S\ÍM   9S    ø 9S    èÌM x  ÀĞM ™]wV¿ÕşÿÿÿHÍM ğÛYw     9S          9S        ø 9S@n÷`ÍM ;ÕYw    ˆÍM \ÍM ô:SÍM  dXw  9S       ˆÍM  Eæ    œÎM P   Ç"       àd Âz ğæv+]wÛ£zÿÿÿÿ$ÎM (ÎM    ÎM  Eæ Eæ  qwüÍM ¸ÍM Ğ&åvÀĞM ŒâZw ğæv¼âZw     ğæv¨Şf‰,ÎM  ğæv    ¨Şf‰,ÎM _àZwÜ   ÈÛØĞM ÜÈÛ       ğæv      ÈÛØĞM ®ßZwYŞZwÖ<”¢ ğævrŞZw¦nkR  L   L   ûX!™v    @İàu                      ğævœãåv ğæv@š:S EæÈÛ ›:S¨ÎM     @š:S ›:S¿  ¿     €    ú   L     à[÷ ÏM œìM #”¢lĞM ØÏM 4  Àb^wÜÎM Db^wœÏM ØÏM ¬ÏM ÷VÖulĞM   $ÏM Èø¬¶  €lĞM °VÖu   ø  ØÏM @           \ \  ”]lĞM     ØÏM  ”]\ \     ø         ø`   @‚[¤ÏM ìÏM    ğÏM     ~SÖu    Èø¬¶ÏM     ĞM `ìØu¤fÃşÿÿÿ       øĞM %RÖu`§ãupç¬¶”ĞM     à˜]W#:w\ \  ”]     ÓM       ø     ÄÏM ¥âœìM `ìØuÄfÃşÿÿÿ8ĞM ŒPÖuø   ”]      lĞM         pĞM ­V]  € ”]      lĞM (ÓM à˜]   Èîë˜­âÈîë    ˜ĞM >V] p]”ĞM à˜](ÓM à˜]           ¸ĞM V]   ÜĞM @    p]à˜]à˜]`ÑM ÜT]   ÜĞM     à˜]    àNåvåU]                                                                                                                                ÖÊkÈİM ât](ÓM    t;Ê¨ú‘v]   ğ^]Ğ]Àc]°X]Àa] -]ğ\]K]@p] b]0¹]ğq]0+]] ²]@‡]Ğ¼]€]]€y]`g]pa]@c]`U]Z]ğ\]Ğx]`f]        Ğ]]*] z] h]p$]`h]`|] ‡] c]àb] H]°`]@^]+]Pq]à…]P%] a]pc]ğY] 8] q]`T]    À¤] \]        ·]@]Ği]o]pn]P[]€k]        OverlayBuffers  şWZwpe]Ğ5]0X] ÀÇ	   À  €ÑM                         Hú   ¬æù       q»U                     @      @#¸        @4]¨úp4ã´ú  œLû     @   4ú   şÿÿÿ  #¸      ÿÿÿÿ   Ş    8áM      ŞM             ü”Lû  e F o r c e   G T X   1 0 6 0   9*°yP¢Zw €éy    _     # + + S + + F          ¨ÔM h·•yxÔM                                             ¬ÚM     8áM   oy À ø§y<ÔM tÜ•y  oy À  ğ§y ğ§y    ø§y¨ÔM Ş•y  oyh·& vˆÿÁø§y    ÜİM  ıI h·•y¨ÔM     $ÕM >‡\wh·•y ğ§yø§y ğ§y      oyPÔM     äÔM `×•y    ìİM Ü·•yÌÔM     ÌÔM             ĞÕM  ÖM ğÔM âq^wĞÕM ÜİM  ÖM ÜİM ĞÕM    ÜİM ¸ÕM ´q^w   ÜİM ĞÕM  ÖM h·•yÜİM ĞÕM  À| o†\wĞÕM ÜİM ¸ÕM ¤†\w        ŞM ·†\w     ÖM ÜİM 2    0M   N                                                                   "@                            :9”¢øİM 6;]w[]wD;]w ÖM       €         Îpy                                                                                               ÿÿ  ÑŸ	                 Ì×´@       €ÿ?     VsËÀ       €ÿ?     Ì×´À     ŒØ´@     ÌØ´@ y{k»dÕş?    +   S   +   +        ŞM 8áM ¬ÚM        øİM !Îpy#   F   ÛM +         ÑŸ	               ÿÿ       Ì×´@             €ÿ?           VsËÀ             €ÿ?           Ì×´À           ŒØ´@           ÌØ´@       y{k»dÕş?                                                                                                                            "@        h¶    €İM pØM             ÌÜM Fåµ                                0ûÿÿ€  0ûÿÿĞ  ğ   À      \ØM   @             Îpy                                           iğ¾yP¢Zw €éy                                                4ıÿÿà  4ıÿÿÌ  T   ÙM sª•y¨€éy[œ•yDÙM dœ•yß"wÜ•y €éyğ£Zwğ¾y<ÙM ;­•y¨€éy[•yTÙM d•y¨€éyaŸ•y ŞM iğ¾yøİM J€òy €éy                                                                                                                          ë                                                                                                                                                                                                                                                                                                    ÇÍpy?                                ÿÿ  ÑŸ	                 Ì×´@       €ÿ?     VsËÀ       €ÿ?     Ì×´À     ŒØ´@     ÌØ´@ y{k»dÕş?    +   S   +   +   ¬ÚM }Şœ¤8áM „åM q‡óË4æM ôÚM  #     TÚM +         ÑŸ	               ÿÿ       Ì×´@             €ÿ?           VsËÀ             €ÿ?           Ì×´À           ŒØ´@           ÌØ´@       y{k»dÕş?       = İM d+ãİM •VZw       ˜İM                           (   Hˆ d           XÒã        P+ã  ˆ            (     ˆ Ìˆ     Db^w(1ã  ˜İM     ,İM şSZw   şSZwd       hÒã$        $ P+ã(1ãXÒã  ˜İM `İM †‡Zw            û/L§¹{»tİM ÖF–y      (1ã€İM ]•y(1ãìİM ÓQ#z(1ã    Œúfw`Ôfw(1ã 
+py ŞM ˆø	      	    VwE“€ˆÔfwĞiğ£Zw+   ÜİM ;­•yØi[•yôİM d•yØiaŸ•y ŞM 8H áM #†"zĞi      œ3¦y3      ‡    %ÿÿÿÿ®=ˆú                  §.Ä‚ª[í.Ğì^ â4:±]Ó6¿õa&¼ì­Æ»œûı    F]‚ªµäª^=§Şúºó(¡Éòî™>ƒ©    Çwa/@            Ì×´À         ŒØ´ÿÿÿÿ[Ğó†ò¾¤yn~8ø›ßéú_D ½ª×ÿx?   ãæ¾¤ ƒàrÕZ¯µÿOxÑ$%™Z9‡_êÿ),black.dd           íª.ìĞ^â4 ±]:6¿Óõ&¼aìÆ­œû»ı    ]‚Fªäªµ^§=Şºóú(Éò¡î>ƒ™©    ØßM    ñ    ìãM 
+   ÌßM ü  	   €ßM û#¶$       œL8H     ñ    ìãM <§yŒ@$       ØßM _   4    Ğ!  –     pr      V     ü”Lû  Ô;§y1±13@ØßM        000000.832 ,Ø½„èM ½äM <§y   # + + S  Ğü !         .text            àü                                    „åM ÿ   .Ä§‚    LçM                                   ü]wÿÿÿÿª   ü  D       Ğ|      ıI      èI <ğ¾y Ğ’    Ğ’¸¸\w<“hw    °    üğ¾yĞi+   F  x       @             áM  ŞM ÀéM Àqy6       <“hw    ğ¿láM û¸\wìhhwlâM âM     ŒØ´âM lâM    ¸âM       ğáM ìèèáM •VZw       hâM   /€Zw”¢hâM     I€ZwlâM   Ğˆ ¬áM ›×uÑ[w¨áM €×u 	¼áM x'¸€æM Šõµ ×"d    €  €æM ²ôµd   <âM $âM €æM Fåµ        tÒµ!   (çM ™Òµ 	hLä(wôµ    HçM !           âM $        âM     åëTèM                                            <âM     åëTèM                       L   g e n       L o g s \ G a m e C r a s h e s \ 1 4 e c e 9 6 1 - 5 f 7 6 - 4 f 9 c - 4 e a 4 - b 4 3 6 8 5 b 7 f f 7 0 . r u n \ 0 0 0 0 0 0 0 0 - 0 0 0 0 - 0 0 0 0 - 0 0 0 0     ãu¨…ãu0 0 0 0    áqYwpäM     0           8rYw                L†ãu                                                                                                                                                                                    Db^wxè                         d       õæ         Øèxè õæ      ¬äM †‡ZwÑ[w                    ”¢¬éÖuPåM     ãu€ãuæM ëéÖu   áqYwèåM     0      Ø  8rYw     è    ´ãu                                                                                                                                                        ÄæM Œ]w,ÚÖuØ              àåM 0³êD           dÑ¬¶4æM    0³ê  ˆ <ˆ     D                                                       ê”¢   LæM FöÖu««««ü]w        $×Ú       $×Ú@ŞYw\æM T1·0btæM ›×u        âM  	   x'¸ña¾Ë´æM Ñµ$       (çM !   Äë    TèM     çM  •]   ÜæM û#¶$       (çM !   ÿÿÿÿÄë    TèM DèM Œ@$       (çM !   ÿÿÿÿÄë    TèM ĞêM €B¸ÀÊò¹ Äëàò¹ (çM        handing control over to crashpad âãDb^wğè      u      B e˜âãäd   Db^wè4ã  ¸À  Øèğè õæ  d       hÒã<        $ P+ãè4ãXÒã    äçM †‡Zw            ğèl]w;/Øu     èM  ß¬¶ĞêM €B    $                                   º<Üÿÿÿÿ    ìçM ğ’ÀéM `ìØuìoÃ    TèM ß.Øu`ê      ÌéM `ª“`ê  ½n¾Ë    ¸À                                                                            ĞèM ›×u        läM  	   x'¸­o¾ËéM Ñµ$       „éM    Ğé    °êM    xéM  •]	   8éM û#¶$       „éM    ÿÿÿÿĞé    °êM  êM Œ@$       „éM    ÿÿÿÿĞé    °êM     ¸À    Êò¹ Ğéàò¹ „éM       handling exception                                          ˆêM {»ÿÿÿÿ”êM Š“ĞêM åm¾Ë                                                                                                                0º ÜLëëM     €êM øÑZwÜLë            0º     ëM ˜êM     \ëM ‘w»ÿÿÿÿ êM Û“ĞêM ´êM ø¼’€µĞêM 0º |úM î¹ ĞêM           pÎéHìM ˜ìM 9º ëM M`wëM 2\]w|úM şÿÿÿ    $ëM °U]w            HìM ˜ìM èÃfw   ØÃfwàÂV DëM °™]wp³hwÀ7]wHìM lúM ˜ìM ÔëM hëM âq^wHìM lúM ˜ìM ÔëM  úM  r^wlúM 0ìM ´q^wHìM lúM ˜ìM ÔëM ™]wlúM HìM     o†\wHìM lúM ˜ìM ÔëM ™]wìñM òM HìM     ˜ìM lúM 2    0M   N           "@                                                                                    ²”¢‚È6;]wHìM ˜ìM HìM ˜ìM   À        l¥Ä                                                                                               ÿÿ  B                 Ì×´@       €ÿ?     VsËÀ       €ÿ?     Ì×´À     ŒØ´@     ÌØ´@ 8QiÕş?    +   S   +   +   ìñM òM      ğ| q‡óË    ‚Èl¥Ä #   ! xñM +         B               ÿÿ       Ì×´@             €ÿ?           VsËÀ             €ÿ?           Ì×´À           ŒØ´@           ÌØ´@       8QiÕş?                                                                                                                            "@                    0ûÿÿ°  0ûÿÿĞ  ğ   ğ            À            l¥Ä                                                                                                                                   ˆUêDb^wl¥Ä     4ğM Db^w(¶Ü4ıÿÿ¨  4ıÿÿÌ     À  Db^w              €                                                                                                                                                                                                                                                                                                                                                                                                                                                 â«
+@ŞYw «
+Ç  tñòM ‚È=j¾Ëd¥Ä 8ÑêxóM à"w    l¥Ä È(ó,   3Ş                    €?À¿¬
+                      1288   ‚X”¸gV        â«
+    `9øá        â«
+©3ôà«
+ ó®
+        â«
+    Àá«
+           â«
+      œòM         pª
+   À¿¬
+tñ        adfile òaZwÛ|Zw        â«
+˜ôM      ó®
+        hunk_id  Í€ñ®
+        â«
+> @ ÿ  XóM         hunk_size „c-        1288   ‚X”¸gV        xpected_hash           â«
+XóM                 ctual_hash ÿ          â«
+    `9øá        â«
+XóM                 â«
+> @ ÿ  XóM        xóM ä      FATAL ERROR - Installation is corrupt. WadFile chunk verification failed.
+ - WadFile : DATA/FINAL/Bootstrap.wad.client
+ - Chunk   : 3082c065bbd27674
+ - Expected: df5c3481868970d1
+ - Seen    : a0b75e4018c81482
+ - Size    : 11288
+ o.hî‚toc¥xxÈ„ÇŒúÿ¾ëlP¤÷£ù¾»– õM ,õM {S11288   õv¾ËZÜÅ ¨Ÿ
+tvÒ»eÀ‚0Ñp‰†4\ß‚È@^· ,  ôë6¨Ÿ
+üôM èôM ôôM ğôM  3ŞÀıŞŒ¢
+€Ÿ
+€Ÿ
+Ñp‰†4\ß,  ‚È@^· tvÒ»eÀ‚0È‚ ·^@–øÉbaB³4’WE,$0zDÉ½"çô0î=À`                                                                             ‚È@^· bÉø–4³Ba,EW’Dz0$ç"½É=î0ô•s¾ËÑ6 3ŞÀõM öM €
+ài 
+ Ÿ
+ 3Ş¢
+ Ÿ
+¤…µ    tvÒ»eÀ‚0iÅ6tvÒ»eÀ‚0    $—ï ]w$—ï      s]:$—ï ]w    Ğá«
+ˆ¹´^ğ    ÿ\:$—ïÔá«
+   €  8   ]wÎK$$—ï ÙÆ        úM  À| L     +   Ó
+4 lÑW    œöM       €££
+1   3   LöM ğÏÆ    À| ?       À;  DG   n_GB  
+¸Oê                                   HighlightsPath         Locale                @œ
+        n  5   ?    ÷M         ıÿÿÌ  (   À  ¦                          €                                                                                                                                                                                                                    D:\Games\League of Legends\LeagueClient.exe                                                                                                                                                                                                                         =q¾ËíQÄ     úM  À|     ´Öê                                                                                               M~¾ËŸÅ PQÄ  ˆœ
+          À
+%îÿº³  –     èp   a}¾Ë Ğú Ğú À|       À    ÜùM (ëM lúM Jµ©úÖÉ     úM )ú"w À| ú"w|úM ôu\w À| z”¢         À|   À    0º @jVjV@        ëM pĞV    ,úM ëM „úM ™]wŞ/¿Õ    ŒúM Äu\wÿÿÿÿ^s^w         Ğú À|                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         õ‡ èñ‡ üó‡ (QZw õ‡ ÀØV   õ‡ õ‡ ±QZwV X     ¼Vw õ‡         V   V X ÀØ   ÀØ    Dô‡                œó‡ òaZwÛ|Zwš^¢  X   8ô‡                   Ìó‡ z {Û|Zwz {  ¾   hô‡       z {          z {    z {              ×   _ÿÿÿÙ   kÿÿÿÀØ    
+   ’şÿÿ        €¥    ã   kÿÿÿå   „ÿÿÿø×    Ù   ¸µ      š¥    ó‡ øò‡ çèYw<ó‡ °WVw   p€   hõ‡    Lõ‡ §çYwD   KèYwp€    5èYwhõ‡      & Nó‡ C : \ W I N D O W S \ S y s W O W 6 4                å  xµ    ;                   ğ×4÷‡ ™]w   şÿÿÿ    şWZwX   `      Œô‡   I€Zw™]wöW¿Õ    `ô‡ Ğ       Ğ  Ğpô‡    p           ªÌô‡ xô‡ 4÷‡ ™]w6P¿Õşÿÿÿlô‡ b^w    Db^wø×  €öM                 şSZw    õ‡            Û¯Öô‡ äK[wghwô‡ YK[wà\hwp€  @  € p€    ĞÕÌ]w	ïZwÿÿÿÿ  p€    p€    èÕ    ¸         } èô‡ èô‡ hìZwp€    „ş@õ‡            ü]wµJ[w°   p€5 ÀĞÕ       õ‡ @                     |õ‡ ^^¢p€Ôõ‡            $õ‡ °D[wö‡ ™]wV¿Õşÿÿÿ„õ‡ ğÛYw             p€         ™](ö‡ éZw	   Ğõ‡ Ôõ‡ .^¢p€        kÊ*wkÊ*wğ Vwe aĞõ‡ ;ÕYwĞÕ`ÔfwkÊ*wkÊ*w ö‡       Vw	  Œúfw%»Yw˜f        øk*^¢ŒâZwp€¼âZw8ö‡ .^¢˜õ‡ ,]wØö‡ ™]wQ¿Õ.^¢@ö‡ ÎèZw   ĞÕ    èö‡ \ÛYw§  î^¢ ]hwp€                    ôÕ    @ŞYw   `/}     lø‡ ÷‡ ×[wœ!} ¤ö‡ +[wlø‡   [w’[w        ĞÕ  v    î^¢    p€    lø‡   [w    à\hw    ğnÿÿÿÿ       D÷‡ bôYwÿÿÿÿVóYwlø‡ Ú[wlø‡     P   0m  [wë[w         ]hw”€lø‡ \÷‡ 0ù‡ ™]w¾V¿ÕşÿÿÿŒ÷‡ ù&[w &[wĞn@|ı![wlø‡     Ğn0m  [w  @|        \3]w0[wœ   x|   ø‡ äø‡ F^¢[w[w0m  }   }   œ     0 œ         }                    8m                                              |         À| x|           Ho        0m      pş” TÂ| xş” hm    €  0m                                                                                                                                                                        8~           F^¢œ÷‡     œù‡ ™]wNQ¿Õ   Pù‡ )ú"w0mú"w¬ù‡ ôu\w0mª^¢        0m                                        \ù‡     ´ù‡ ™]wŞ/¿Õ    ¼ù‡ Äu\wÿÿÿÿ^s^w        [w0m                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         P} xhhw        (õ” øÑZwxhhw             P} ö”     Tõ” O–\wxhhwdw            P} ö” S       Ä¾5$ù” 4fhw     P} ö”           Tˆö” •VZwm              hohfhw    l       hoôõ” 8[w       <ü” ho<ü” 2Zwù” ho [hwpwvØø”     ho    $ö” 39[whfhw    <ü”           <ü” @ü” 	   Øø” €öM Øø” ü” ¶)ZwÊM¢   ü” /Zw +ZwM¢øk    c+Zw      ( ho                    ù” üø” üù”                                 Ø0 ş"ù” $              p   ÿÿÿÿÿÿÿÿíÃ\w/Zw& àù”   °WVw  €ZD J  Ø÷”         ‰  0 ş  0 ş        *                     ú” Øø”     F   @ü” Øø”    ‰<ü”     Ø  T  økW       ho         pâ                                                                                       Ø÷”   p i - m s - w i n - c o r e - p r o c e s s t h r e a d s - l 1 - 1 - 0                                                                                                                                                                                       D  àø” C : \ W ”ú” òaZwÛ|Zw’M¢  (   0û” 2 \ k e r n e l b a s e   l l                       # !                                                    Ğş       ãıÿÿ        t¥                                            ÿ  #  À Ğµ                \ W €   D O W S   y s £      4   èk0           À            Èş      ÈşĞş            t             xµ            xµÏş        ”û” ™]wöW¿Õşÿÿÿ(û” şWZw(   0   ¼üú” ü”       `€       èß  Õ÷Zw€  p½Zw      ˆû” Tˆ€û” •VZwM       ü”      (   Lû”    ˆ\hw      Ğˆ d   Xû” u\wXŠ        @ˆ  ˆ                  ˆ Äˆ    üˆ    ˆ‰øˆ ğÛYw¤û” şSZw    şSZw               ü”         Hü” áêZwghwNM¢Ø        õËAw‰ˆ‰Ğş       Àá    ü” ü”                                       ŒâZwØ¼âZwXü” NM¢¸û” ,]wøü” ™]wQ¿ÕNM¢`ü” ÎèZw7   Àá    ı” \ÛYw§  M¢ ]hwØø   
+ 0    äá    Pf^w   `_}     Œş” (ı” ×[wœQ} Äü” +[wŒş”   [w’[w        Àá  Vw    M¢    Ø    Œş”   [w    lnXn  ğnÿÿÿÿ          `_} ÿÿÿÿĞnŒş” Ú[wŒş”     P   0m  [wë[w oĞn ]hw ]hwŒş” |ı” ´%[w0m¨á¨áë&[               øß              $ÿ”   ˜ı” ˜ı” \3]w0[wœ   èß   8ş” ÿ” fM¢[w[w0m P}  P}   œ     0 œ        P}                   8m                                                       À| èß           Ho        0m      À÷Pø‡ È÷Xø‡     -  0m                                                                                                                                                                        ¨á           fM¢¼ı”     ¼ÿ” ™]wNQ¿Õ   pÿ” )ú"w0mú"wÌÿ” ôu\w0mÊM¢        0m                                        |ÿ”     Ôÿ” ™]wŞ/¿Õ    Üÿ” Äu\wÿÿÿÿ^s^w        [w0m                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         €} xhhw        xîøÑZwxhhw             €} `ï    ¤îO–\wxhhwdw            €} `ï%       Ä¾5tò4fhw     €} `ï    "      LXï•VZwb              hohfhw    l       hoDï8[w       ŒõhoŒõ2ZwXòho [hw ~ (ò    ho    tï39[whfhw    Œõ          Œõõ	   (ò€öM (òhõ¶)ZwÛ¦   hõ/Zw +ZwnÛ¦øk    c+Zw      ( ho                    lòLòLó                                °0 şrò$              p   ÿÿÿÿÿÿÿÿíÃ\w/Zw& 0ó  °WVw  €ZD J  (ñ        À  0 ş  0 ş        *                     Vó(ò    F   õ(ò   ÀŒõ    °  T  økW       ho         ù                                                                                       (ñ  p i - m s - w i n - c o r e - p r o c e s s t h r e a d s - l 1 - 1 - 1                                                                                                                                                                                       D  0òC : \ W I N D O W S \ S Y S T E M 3 2 \ k e r n e l b a s e . d l l                                                                                                                                                                                             C : \ W I N D O W S \ S y s W O W 6 4                                                                                                                                                                                                                                                                                     ˜nZwøÿ    Û|ZwÛ¦  `   ¸ö      ÎÛ¦°Dõ  vBÛ¦ v    ”ô    ˆõ™]wV¿ÕşÿÿÿôôğÛYw     v        °         v™]˜õéZw	   @õDõÛ¦°        ¸íâu¸íâuğ Vw   @õ;ÕYwxò`Ôfw¸íâu¸íâupõ      Vw	  Œúfw%»Yw˜f        hošÛ¦ŒâZw°¼âZw¨õÛ¦õ,]wHö™]wQ¿ÕÛ¦°õÎèZw   xò    Xö\ÛYw§  ^Û¦ ]hw°ğÿÀ   
+ 0    œò    à[w   `}     Ü÷xö×[wœ} ö+[wÜ÷  [w’[w        xò  Vw    ^Û¦    °    Ü÷  [w    lnXn  ğnÿÿÿÿ          `} ÿÿÿÿĞnÜ÷Ú[wÜ÷    P   0m  [wë[w oĞn ]hw ]hwÜ÷Ìö´%[w0mĞnüöë&[wà\hw &[wĞn ı![wÜ÷    Ğn0m  [w           \3]w0[wœ   `    ˆ÷Tø¶Û¦[w[w0m €}  €}   œ     0 œ        €}                   8m                                             øÿ         À| `            Ho        0m      <÷	pş” hmxş”     T*  0m                                                                                                                                                                                    ¶Û¦÷    ù™]wNQ¿Õ   Àø)ú"w0mú"wùôu\w0mÛ¦        0m                                        Ìø    $ù™]wŞ/¿Õ    ,ùÄu\wÿÿÿÿ^s^w        [w0m                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        P¢Zw €éy                                                                            îásª•y¨€éy[œ•yLîádœ•yß"wÜ•y €éyğ£ZwÿÿÿDîá;­•y¨€éy[•y\îád•y¨€éyaŸ•y       üòáJ€òy €éy                                                                                                                          ë                                                                                                                                                                                                                                                                                                                    ÄñáòaZwÛ|ZwÂ8§  `   `òá                      "j@                        "j@                                        ÿÿÿÿà•ÿÿ   úÿÿÿXé    
+   ë•ÿÿ        ‚¥                                             €      À ”                                               H.h          (ê             Pé             òáìKòá•VZw|       ˜òá   °}          pWé(   Ğˆ d   ™]wöW¿ÕÀ‹        ØK  ˆ             (     ˆ Ìˆ     Db^wĞN  ˜òáPóá,òáşSZw   şSZwd       Ğ‹         ØKĞNÀ‹  ˜òá`òá†‡Zw            û/L§¹{»tòáÖF–y      ĞN€òá]•yĞNğòáÓQ#zĞN    Œúfw`ÔfwĞN éùm˜yĞòá	      	    Vw    ˆÔfw gwhVwpò|éyáJËhã¹¼´E¤ZwÙ   #Hgw#Hgw £	      óáLßˆóá•VZw`       èà  «ÖHÊ#È¹     àdP¢Zwbéy0   Ğˆ d    á  VwÓ        8ß  ˆ             0     ˆ Ğˆ $   4
+ˆ ˆóásª•ybéy[œ•y¼óádœ•yß"wÜ•ybéyğ£Zw<béy´óá8®•y@béyÌ •yÌóáÕ •y@béyÜ¡•y àd<béyøóáÌºpy<béy[•yØóáĞôá€4qyÿÿÿÿ ôá àd    ìôáÕñy            @ÿÿÿÿ  ûá                            §[w        °   8ÎK(ûá€–˜ ±$šâF   õá ı?    Àğ?    `FUw    §[w                  <“hw    ÿÿ          \G  \G                          ìôá ôáÿÿÿÿ qyÿÿÿÿ    <“hw    °<õáû¸\wìhhw8öáèõá       èõá8öá   ˜èõá8öá         À| ÿÿÿÿ        Ğõá¤†\w           ·†\w    8öá                                                                                                                R8§    6;]w[]wD;]w8öá      €        §[w                                                                             Û|Zwê8§     ˆøáÿÿ                    "j@  ˜nZw  ˜nZwà\    Û|Zw28§  ¼  Ğøá                    $$   " 3  ˜nZwz  Û|Zw$$    ùá    € #     ûá    C  =İÿÿE  œğÿÿà\  w   qÜÿÿD¦    Z¦      $$!   " 3˜  ˆ¶E  ˆ¶  $$zÿ  ¾  À Àµ    à8           €   ¶İÿÿ¾  E    >  ıáP¢Zw €éyÈ  "  À      
+        E  Ø\ˆ¶Å   Ø\à\+       À  øásª•y¨€éy[œ•y4øádœ•yß"wÜ•y €éyğ£Zw   ,øá;­•y¨€éy[•yDøád•y¨€éyaŸ•yˆ5‘ºıáèüáJ€òy €éy      g   pztøá   hùá™]wöW¿ÕşÿÿÿpşWZw        ´äøáy          È  ™]wöW¿Õ¼  Hùá      à\      ëşSZw    şSZwäøáü||uĞ•ùáv#5tk        và\    ôøáà\Dùá   pCwìøá   ˆùá€{vÛõ„şÿÿÿ˜ùáüKv"Lv‹5tk@Kv   ¹³~Î²¸³|ùá    ÄùáğU»ÿÿÿÿˆùáæ]w  –            ²¸³  – Ôùá'ÿYw²¸³  – WÿYw=ÿYwÒ8§²¸³Xúá    2Zw  –    € ùá Zwúá™]wşV¿ÕşÿÿÿúáXúá   Œ]hw8§Xúá    Xúáà\hwŒ]hwrC[wXúá    ì]wt¾[w|           ZwÍZw¶8§ À|      °} $              p   ÿÿÿÿÿÿÿÿ¤Zw
+Zw$          œÔ`   ÿÿÿÿc+ôû8ZwñZw        @Kvàá@KvŒ]hw À| $úá    øúá™]wW¿Õşÿÿÿ+2]w¨[w8§                             °}       Vw    (ûá    ¸úá    ÿÿÿÿ™]w[]w9§[w(ûá               (ûá  Vw    ?                                ÿÿ                     üáäjøûá•VZw"       ˆüá                          (   Ğˆ d           HÕ        Ğj  ˆ             (     ˆ Ìˆ     Db^wØl  ˆüá  üáşSZw   şSZwd       XÕ         ĞjØlHÕ  ˆüáPüá†‡Zw            û/L§¹{»düáÖF–y      Ølpüá]•yØlÜüáÓQ#zØl    Œúfw`ÔfwØl 
+pyıá`é	      	    Vw´ş4	ˆÔfw gwhVw`ò\G  Ôú†Û$¯ıáêÕ—ºêÕ—ºıá    tıá £	˜úÿy    @ıá          £	          £	          êÕ—º                        ¶’—º            
+úÿÿÿÿ                      ±	       @@    „ıá)ú"w    ú"wàıáôu\w    æ8§                                                    ıá    èıá™]wŞ/¿Õ    ğıáÄu\wÿÿÿÿ^s^w        @                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        P¢Zw €éy                                                                            Øêésª•y¨€éy[œ•yëédœ•yß"wÜ•y €éyğ£Zwÿÿÿëé;­•y¨€éy[•yëéd•y¨€éyaŸ•y       ¼ïéJ€òy €éy                                                                                                                          ë                                                                                                                                                                                                                                                                     ˆ    Øˆ   ˆ ÔìéŠÁ[wĞìé       ˆ pˆ „îéaÁ[w‚¥Û|Zw‚0§  `    ïé                    "j@    )  )                  "j@      ™–yJøéØl   ôíéôÿÿÿîé<òé    ˆíé¥–yØl   îé    P¢Zw €éyîéôíéôíé¬íéü–y        ôíé-–y      ér±[ÄPòém–y    )   ş•yş  ÀòéØíésª•y¨€éy[œ•yîédœ•yß"wÜ•y €éyğ£ZwA  îé;­•y¨€éy[•yîéd•y¨€éyaŸ•yÈòé    ÀòéJ€òy €éyØl     ĞîéìKÈîé•VZwk       Xïé   à}          p'ê(   Ğˆ d   ™]wöW¿ÕÀ‹        ØK  ˆ             ë(     ˆ Ìˆ     Db^wĞN  XïéğéìîéşSZw   şSZwd       Ğ‹         ØKĞNÀ‹  Xïé ïé†‡Zw            û/L§¹{»4ïéÖF–y      ĞN@ïé]•yĞN°ïéÓQ#zĞN    Œúfw`ÔfwĞN êùm˜yïé	      	    Vw    ˆÔfw gwhVwpò€éyáJËhã¹¼´lïéÙ   #Hgw#Hgw ¤	      PğéLßHğé•VZw       èã  «ÖHÊ¦AÓ¹     àdP¢Zwbéy0   Ğˆ d    é  VwÓ        8ß  ˆ             0     ˆ Ğˆ $  14
+ˆ Hğésª•ybéy[œ•y|ğédœ•yß"wÜ•ybéyğ£Zw<béytğé8®•y@béyÌ •yŒğéÕ •y@béyÜ¡•y àd<béy¸ğéÌºpy<béy[•y˜ğéñé€4qyÿÿÿÿÀğé àd   ¬ñéÕñy              ÿÿÿÿ  Ü÷é                            §[w        °   8ÎKì÷é€–˜ §,šâF   Ìñé ıå    @òå    `FUw      Øñé”ŞĞñé•VZw`       `òé  ÿÿ          A  A      (    ˆ d            W
+        €Ş  ˆ            (     ˆ Ìˆ     Db^wà  `òéüòéôñéşSZw   şSZwd   Y   °W
+         	 €Şà W
+  `òé(òé†‡Zw            û/L§¹{»<òéÖF–y      àHòé]•yà´òéÓQ#zà    Œúfw`Ôfwà 
+pyàòé0ê	      	    Vw¾GˆÔfw gwhVw@
+òA  °XÒä{àòéÈòéÈòéàòéA   ¤	:ÿüy           ‰        ¤	;   °ì„FT`È–ç’ğ/yÍºZwè  #  ÿ  Wç’   ¤	   ÿ  ÿ  À ˆ¶A     Á	†„F   0DW I N _ B         PCW I N _ D         PíØlW I N _ B           ¤	    Á	         R T øéZ \ öé^ ` ôé       ¾          óé€                  ¨óé€                  °óé€               \ S e s s i o n s \ 1 \ B a s e N a m e d O b j e c t s \ D B W I N _ B U F F E R _ R E A D Y                     f.°ôéO–\wxhhwdw       –î      ,   ôôéüÔ[w4fhwö ‰õé       –î         y      ˆ ğˆ       õéğŸŒWZwøŸ    À  İâ       >       ß     ğˆ È  Ğˆ d        W¿Õö         ‰  ˆ y            È    ˆ ´ˆ ¼  ôˆ    øŸ   øŸ    şSZw    şSZw   ¨õéìæ ü||uàõévç9|k        vøŸ    ¸õéøŸöé   pCw°õé   Löé€{vÛõ„şÿÿÿ\öéüKv"LvO:|k@Kv   ¹³\ S e s s i o n s \ 1 \ B a s e N a m e d O b j e c t s \ D B W I N _ D A T A _ R E A D Y       2Zw      –    ¨döé ZwĞöé™]wşV¿Õşÿÿÿàöé÷é   Œ]hwæ0§÷é    ÷éà\hwŒ]hwrC[w÷é    ì]wt¾[w|           ZwÍZwr0§ À|      à} $              p   ÿÿÿÿÿÿÿÿ¤Zw
+Zw$          œÔ`   ÿÿÿÿc+ôû8ZwñZw        @Kvàá@KvŒ]hw À| èöé    ¼÷é™]wW¿Õşÿÿÿ+2]w¨[wÊ0§                             à}       Vw    ì÷é    |÷é    ÿÿÿÿ™]w[]w9§[wì÷é               ì÷é  Vw    ?                                \ S e s s i o n s \ 1 \ B a s e N a m e d O b j e c t s \ D B W I N _ B U F F E R                       +   S   +   +                             à;]w#     ¸úé+                         €  ÿÿ                                                                                                                                                                                                                                                                                                                          8úéÈòé”úép4qy                   Húé)ú"w    ú"w¤úéôu\w    ¢0§                                                    Túé    ¬úé™]wŞ/¿Õ    ´úéÄu\wÿÿÿÿ^s^w                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              P¢Zw €éy                                                                            ¸èsª•y¨€éy[œ•yìèdœ•yß"wÜ•y €éyğ£Zwÿÿÿäè;­•y¨€éy[•yüèd•y¨€éyaŸ•y       œíJ€òy €éy                                                                                                                          ë                                            Û|ZwRÅ¤     ğë                                æ ğ                  "j@                                                    êÿÿà×    ÿ   ß–ÿÿ                                                            ÿ    À ¬µ                                                 Ğ          à(   €           Ø×    ¸Ø×à×                         	     ÿ  xµ     ß×        |í™]wöW¿ÕşÿÿÿèëşWZw         ¼ë                                                                                  ƒ   xhhw.5   øëøÑZwxhhw            ƒ      .5 ìO–\wxhhwdw          °ììK¨ì•VZw`       8í   í       0àÎS       (   Ğˆ d   pˆ     À‹        ØK  ˆ             (     ˆ Ìˆ     Db^wĞN  8íd   ÌìşSZw   şSZwd       Ğ‹         ØKĞNÀ‹  8í í†‡Zw            û/L§¹{»íÖF–y      ĞN í]•yĞNíÓQ#zĞN    Œúfw`ÔfwĞN Şùm˜ypí	      	    Vw    ˆÔfw gwhVwpò€éyáJËhã¹¼´LíÙ   #Hgw#Hgw ¥	    
+  0îLß(î•VZwN       Hä  «ÖHÊù#Ş¹     àdP¢Zwbéy0   Ğˆ d      VwÓ        8ß  ˆ             0     ˆ Ğˆ $   4
+ˆ (îsª•ybéy[œ•y\îdœ•yß"wÜ•ybéyğ£Zw<béyTî8®•y@béyÌ •ylîÕ •y@béyÜ¡•y àd<béy˜îÌºpy<béy[•yxîpï€4qyÿÿÿÿ î àd   ŒïÕñy            €ÿÿÿÿ  §[w    àğ            F       ğ}         °   8ÎKÈõ€–˜ 4šâF   ¬ï                      €  ÿÿ                  <“hw                ˆ  ˆ                          Œï îÿÿÿÿ qyÿÿÿÿ    <“hw    °Üïû¸\wìhhwØğˆğ       ˆğØğ   ˜ˆğØğ         À| ÿÿÿÿ        pğ¤†\w           ·†\w    Øğ                                                                                                                òÅ¤    6;]w[]wD;]wØğ      €        §[w                                                                                               ÿÿ                            ˜nZw8é    Û|ZwÊÅ¤  d  hó                        \  \            +     ˜nZwğ€    Û|ZwÅ¤    ¸ó    € #     ¸õ    °    Û|ZwRÅ¤    €P¢Zw €éy        Ğ  X\  \        ÿ  ”Æı°  –  ›  M ]ğ€À B   eşÿÿ òsª•y¨€éy[œ•yTòdœ•yß"wÜ•y €éyğ£Zw÷Lò;­•y¨€éy[•ydòd•y¨€éyaŸ•y÷€÷J€òy €éy€   0é  ›      _      À    xµ    À   
+      7 ›  è€    è€ğ€      pó`˜ŒWZwh˜      ëİâ       ›  hHï€ó    È  Ğˆ d   şÿÿÿ°óö         ‰  ˆ y            È    ˆ ´ˆ ¼  ôˆ       h˜    ˆóşSZw    şSZw„óü||uĞ•¼óvÃ?‰h        vh˜    ”óh˜äó   pCwŒó   (ô€{vÛõ„şÿÿÿ8ôüKv"Lv+8‰h@Kv   ¹³ysïÍ²¸³ô    dôğU»ÿÿÿÿ(ôæ]w  –            ²¸³  – tô'ÿYw²¸³  – WÿYw=ÿYwrÅ¤²¸³øô    2Zw  –    €@ô Zw¬ô™]wşV¿Õşÿÿÿ¼ôøô   Œ]hwºÅ¤øô    øôà\hwŒ]hwrC[wøô    ì]wt¾[w|           ZwÍZwVÅ¤ À|      ~ $              p   ÿÿÿÿÿÿÿÿ¤Zw
+Zw$          œÔ`   ÿÿÿÿc+ôû8ZwñZw        @Kvàá@KvŒ]hw À| Äô    ˜õ™]wW¿Õşÿÿÿ+2]w¨[w®Å¤                             ~       Vw    Èõ    Xõ    ÿÿÿÿ™]w[]w9§[wÈõ               Èõ  Vw    ?                                ÿÿ                                                                                                      +   S   +   +               è€éy@X         ¥	L]w©÷Öuÿÿÿÿ    Ğö˜Áı°ÿÿÿÿ÷(÷$                                  €ıÿÿÿÿĞö    ÿÿÿÿZc‡Ÿºğ÷`ìØudÃ    øGğzÿÿÿÿˆ                ¥	            ÿÿÿÿ    ‡Ÿº                        ƒ”Ÿº                                         ¥	                                                                                                          ø÷pøqyÿÿÿÿ            €€    $ø)ú"w    ú"w€øôu\w    †Å¤                                                    0ø    ˆø™]wŞ/¿Õ    øÄu\wÿÿÿÿ^s^w        €                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        P¢Zw €éy                                                                            8ì$sª•y¨€éy[œ•ylì$dœ•yß"wÜ•y €éyğ£Zwÿÿÿdì$;­•y¨€éy[•y|ì$d•y¨€éyaŸ•y       ñ$J€òy €éy                                                                                                                          ë                                        
